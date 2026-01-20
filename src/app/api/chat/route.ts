@@ -78,42 +78,81 @@ export async function POST(req: Request) {
         }),
 
         getDoctorAvailability: tool({
-            description: 'Get available time slots for a doctor or department',
+            description: 'Get list of doctors in a specific department along with their specializations and available time slots. Use this when user asks about doctors available in a department like Cardiology, Neurology, Orthopedics, etc.',
             inputSchema: z.object({
-                departmentName: z.string().optional().describe('Name of the department'),
-                doctorName: z.string().optional().describe('Name of the doctor'),
+                departmentName: z.string().optional().describe('Name of the department (e.g., Cardiology, Neurology, Orthopedics)'),
+                doctorName: z.string().optional().describe('Name of the doctor to search for'),
                 date: z.string().optional().describe('Date for availability check (YYYY-MM-DD)'),
             }),
             execute: async ({ departmentName, doctorName, date }) => {
+                console.log('DEBUG: getDoctorAvailability called with:', { departmentName, doctorName, date });
+
+                let departmentId: number | null = null;
+                let departmentInfo: { name: string; floor: number } | null = null;
+
+                // If department name is provided, first get the department ID
+                if (departmentName) {
+                    const { data: dept, error: deptError } = await supabase
+                        .from('departments')
+                        .select('id, name, floor')
+                        .ilike('name', `%${departmentName}%`)
+                        .single();
+
+                    if (deptError || !dept) {
+                        console.log('DEBUG: Department not found:', departmentName);
+                        return {
+                            message: `Department "${departmentName}" not found. Available departments include: Cardiology, Neurology, Orthopedics, General Medicine, Pediatrics, Gynecology, Dermatology, ENT, Ophthalmology, Gastroenterology.`
+                        };
+                    }
+                    departmentId = dept.id;
+                    departmentInfo = { name: dept.name, floor: dept.floor };
+                    console.log('DEBUG: Found department:', dept);
+                }
+
+                // Build query for doctors
                 let query = supabase
                     .from('doctors')
                     .select(`
-              id, name, specialization, qualification, available_days,
-              departments (name),
-              time_slots (id, date, start_time, end_time, is_booked)
-            `);
+                        id, name, specialization, qualification, available_days, department_id,
+                        departments (name, floor),
+                        time_slots (id, date, start_time, end_time, is_booked)
+                    `);
 
-                if (departmentName) {
-                    query = query.eq('departments.name', departmentName);
+                // Filter by department ID if provided
+                if (departmentId) {
+                    query = query.eq('department_id', departmentId);
                 }
+
+                // Filter by doctor name if provided
                 if (doctorName) {
                     query = query.ilike('name', `%${doctorName}%`);
                 }
 
                 const { data, error } = await query.limit(10);
 
-                if (error) return { error: 'Failed to fetch doctor availability' };
-                if (!data || data.length === 0) return { message: 'No doctors found' };
+                console.log('DEBUG: Doctors query result:', { data, error });
+
+                if (error) {
+                    console.error('DEBUG: getDoctorAvailability error:', error);
+                    return { error: 'Failed to fetch doctor availability' };
+                }
+                if (!data || data.length === 0) {
+                    return { message: `No doctors found${departmentName ? ` in ${departmentName} department` : ''}` };
+                }
 
                 return {
+                    department: departmentInfo,
                     doctors: data.map((d: any) => ({
+                        id: d.id,
                         name: d.name,
                         specialization: d.specialization,
                         qualification: d.qualification,
                         department: d.departments?.name,
+                        floor: d.departments?.floor,
                         availableDays: d.available_days,
                         availableSlots: d.time_slots
                             ?.filter((s: any) => !s.is_booked && (!date || s.date === date))
+                            .slice(0, 5) // Limit slots to avoid overwhelming the response
                             .map((s: any) => ({
                                 id: s.id,
                                 date: s.date,
