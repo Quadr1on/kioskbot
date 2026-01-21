@@ -14,6 +14,23 @@ const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk a
 4. **Department Guidance**: Based on symptoms, suggest which department to visit and offer to book appointments.
 5. **Doctor Information**: Provide details about doctors, their specializations, and availability.
 
+## APPOINTMENT BOOKING FLOW
+When a user wants to book an appointment, you MUST follow these steps IN ORDER. Ask ONE question at a time and wait for the user's response before proceeding:
+
+**Step 1 - Name**: "I will help you book an appointment. May I have your full name please?"
+**Step 2 - Phone**: After receiving name, ask: "Thank you, [name]. What is your phone number?"
+**Step 3 - Department**: After receiving phone, ask: "Which department would you like to visit? We have Cardiology, Neurology, Orthopedics, General Medicine, Pediatrics, Gynecology, Dermatology, ENT, Ophthalmology, and Gastroenterology."
+**Step 4 - Show Doctors**: When they choose a department, use the getDoctorAvailability tool to get doctors in that department, then list them with their specializations.
+**Step 5 - Choose Doctor**: Ask the user to choose a doctor from the list.
+**Step 6 - Show Time Slots**: When they choose a doctor, use getDoctorTimeSlots tool to show available time slots for today.
+**Step 7 - Choose Slot**: Ask them to choose a time slot.
+**Step 8 - Confirm Booking**: Use bookAppointment tool with collected info (name, phone, doctorId, slotId) to book. Then confirm: "Your appointment is booked successfully! [Provide appointment details]"
+
+IMPORTANT: 
+- Keep track of all information provided (name, phone, department, doctor, slot) throughout the conversation
+- If the user skips a step or provides incorrect info, gently ask again
+- Always confirm the booking details before finalizing
+
 Guidelines:
 - Be warm, patient, and speak clearly (many users are elderly)
 - Use simple language, avoid medical jargon
@@ -164,21 +181,39 @@ export async function POST(req: Request) {
         }),
 
         bookAppointment: tool({
-            description: 'Book an appointment with a doctor for a patient',
+            description: 'Book an appointment with a doctor for a patient. Use this ONLY after collecting: patient name, phone number, doctor ID, and slot ID.',
             inputSchema: z.object({
-                patientName: z.string().describe('Name of the patient booking the appointment'),
+                patientName: z.string().describe('Full name of the patient'),
                 phone: z.string().describe('Phone number of the patient'),
                 slotId: z.number().describe('ID of the time slot to book'),
                 doctorId: z.number().describe('ID of the doctor'),
             }),
             execute: async ({ patientName, phone, slotId, doctorId }) => {
-                // First mark the slot as booked
+                console.log('DEBUG: bookAppointment called with:', { patientName, phone, slotId, doctorId });
+
+                // Get doctor and slot details for confirmation
+                const { data: slotData } = await supabase
+                    .from('time_slots')
+                    .select('date, start_time, end_time')
+                    .eq('id', slotId)
+                    .single();
+
+                const { data: doctorData } = await supabase
+                    .from('doctors')
+                    .select('name, departments(name)')
+                    .eq('id', doctorId)
+                    .single();
+
+                // Mark the slot as booked
                 const { error: slotError } = await supabase
                     .from('time_slots')
                     .update({ is_booked: true })
                     .eq('id', slotId);
 
-                if (slotError) return { error: 'Failed to book time slot' };
+                if (slotError) {
+                    console.error('DEBUG: Failed to book slot:', slotError);
+                    return { error: 'Failed to book time slot. It may already be booked.' };
+                }
 
                 // Create the appointment
                 const { data, error } = await supabase
@@ -193,12 +228,104 @@ export async function POST(req: Request) {
                     .select()
                     .single();
 
-                if (error) return { error: 'Failed to create appointment' };
+                if (error) {
+                    console.error('DEBUG: Failed to create appointment:', error);
+                    return { error: 'Failed to create appointment' };
+                }
+
+                console.log('DEBUG: Appointment created:', data);
 
                 return {
                     success: true,
                     appointmentId: data.id,
-                    message: `Appointment booked successfully! Your appointment ID is ${data.id}`,
+                    patientName,
+                    phone,
+                    doctorName: doctorData?.name,
+                    department: (doctorData as any)?.departments?.name,
+                    date: slotData?.date,
+                    time: slotData ? `${slotData.start_time} - ${slotData.end_time}` : undefined,
+                    message: `Appointment booked successfully!`,
+                };
+            },
+        }),
+
+        getDoctorTimeSlots: tool({
+            description: 'Get available time slots for a specific doctor today. Use this when the user has chosen a doctor and needs to see available times.',
+            inputSchema: z.object({
+                doctorName: z.string().optional().describe('Name of the doctor'),
+                doctorId: z.number().optional().describe('ID of the doctor if known'),
+            }),
+            execute: async ({ doctorName, doctorId }) => {
+                console.log('DEBUG: getDoctorTimeSlots called with:', { doctorName, doctorId });
+
+                let docId = doctorId;
+                let doctorInfo: any = null;
+
+                // If doctor name provided, look up the doctor ID
+                if (!docId && doctorName) {
+                    const { data: doctor, error: docError } = await supabase
+                        .from('doctors')
+                        .select('id, name, specialization, departments(name)')
+                        .ilike('name', `%${doctorName}%`)
+                        .single();
+
+                    if (docError || !doctor) {
+                        console.log('DEBUG: Doctor not found:', doctorName);
+                        return { message: `Could not find a doctor named "${doctorName}". Please try again with the correct name.` };
+                    }
+                    docId = doctor.id;
+                    doctorInfo = doctor;
+                    console.log('DEBUG: Found doctor:', doctor);
+                } else if (docId) {
+                    const { data: doctor } = await supabase
+                        .from('doctors')
+                        .select('id, name, specialization, departments(name)')
+                        .eq('id', docId)
+                        .single();
+                    doctorInfo = doctor;
+                }
+
+                if (!docId) {
+                    return { message: 'Please provide a doctor name or ID.' };
+                }
+
+                // Get today's date in YYYY-MM-DD format
+                const today = new Date().toISOString().split('T')[0];
+
+                // Fetch available slots for this doctor today
+                const { data: slots, error } = await supabase
+                    .from('time_slots')
+                    .select('id, date, start_time, end_time, is_booked')
+                    .eq('doctor_id', docId)
+                    .eq('date', today)
+                    .eq('is_booked', false)
+                    .order('start_time');
+
+                console.log('DEBUG: Time slots for doctor:', { docId, today, slots, error });
+
+                if (error) {
+                    console.error('DEBUG: getDoctorTimeSlots error:', error);
+                    return { error: 'Failed to fetch time slots' };
+                }
+
+                if (!slots || slots.length === 0) {
+                    return {
+                        doctorId: docId,
+                        doctorName: doctorInfo?.name,
+                        message: `No available slots for ${doctorInfo?.name || 'this doctor'} today. Would you like to check another day or choose a different doctor?`
+                    };
+                }
+
+                return {
+                    doctorId: docId,
+                    doctorName: doctorInfo?.name,
+                    specialization: doctorInfo?.specialization,
+                    department: doctorInfo?.departments?.name,
+                    date: today,
+                    availableSlots: slots.map((s: any) => ({
+                        id: s.id,
+                        time: `${s.start_time} - ${s.end_time}`,
+                    })),
                 };
             },
         }),
