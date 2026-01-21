@@ -1,140 +1,162 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useRef, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { PointMaterial } from '@react-three/drei';
+import * as THREE from 'three';
+import { createNoise3D } from 'simplex-noise';
 
 interface AnimatedOrbProps {
   state: 'idle' | 'recording' | 'processing' | 'speaking';
   analyser?: AnalyserNode | null;
 }
 
-export default function AnimatedOrb({ state, analyser }: AnimatedOrbProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function ParticleSphere({ state, analyser }: { state: string, analyser?: AnalyserNode | null }) {
+  const points = useRef<THREE.Points>(null!);
+  const noise3D = useMemo(() => createNoise3D(), []);
+  
+  // Initial positions for a sphere
+  const count = 4000; // Increased particle count for better density
+  const [positions, originalPositions] = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const orig = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+        // Uniform sphere distribution
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 1.2 + Math.random() * 0.3; // Base radius with some fuzziness
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta);
+        const z = r * Math.cos(phi);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+        pos[3 * i] = x;
+        pos[3 * i + 1] = y;
+        pos[3 * i + 2] = z;
 
-    let animationFrameId: number;
-    let time = 0;
+        orig[3 * i] = x;
+        orig[3 * i + 1] = y;
+        orig[3 * i + 2] = z;
+    }
+    return [pos, orig];
+  }, []);
 
-    // Particles configuration
-    const particles: { x: number; y: number; size: number; speed: number; offset: number }[] = [];
-    const particleCount = 50;
+  const color = useMemo(() => {
+    switch (state) {
+      case 'recording': return '#ef4444'; // Red
+      case 'processing': return '#eab308'; // Yellow
+      case 'speaking': return '#22c55e'; // Green
+      case 'idle':
+      default: return '#3b82f6'; // Blue
+    }
+  }, [state]);
 
-    // Initialize particles
-    for (let i = 0; i < particleCount; i++) {
-        particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            size: Math.random() * 2 + 1,
-            speed: Math.random() * 0.02 + 0.01,
-            offset: Math.random() * Math.PI * 2,
-        });
+  useFrame((stateContext) => {
+    const { clock } = stateContext;
+    const time = clock.getElapsedTime();
+    
+    let volume = 0;
+    // Get volume data in real-time
+    if (state === 'recording' && analyser) {
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(dataArray);
+        // Calculate average volume
+        const avg = dataArray.reduce((src, a) => src + a, 0) / dataArray.length;
+        // Normalize and scale up for effect. Average is usually 0-255.
+        // We want a value roughly 0 to 1.5
+        volume = Math.max(0, (avg / 128) - 0.1); 
+    } else if (state === 'speaking') {
+         // Simulate talking animation
+         volume = (Math.sin(time * 8) + 1) * 0.2;
+    } else if (state === 'processing') {
+         volume = 0.1 + Math.sin(time * 15) * 0.05;
     }
 
-    const draw = () => {
-      time += 0.01;
-      
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (points.current) {
+        // Smooth color transition
+        const currentColor = new THREE.Color(color);
+        // We can interpolate if we wanted, but simple switch is fine for now or we can use lerp
+        // points.current.material.color.lerp(currentColor, 0.1); // Need to cast material
+        // For simplicity, just setting it (PointMaterial handles it well usually)
+        
+        const positionsArray = points.current.geometry.attributes.position.array as Float32Array;
+        
+        // Optimize: Don't recreate array, just mutate
+        for(let i=0; i<count; i++) {
+           const ix = i*3;
+           const iy = i*3+1;
+           const iz = i*3+2;
+           
+           const ox = originalPositions[ix];
+           const oy = originalPositions[iy];
+           const oz = originalPositions[iz];
+           
+           // Noise field for movement
+           // Scale noise frequency and amplitude
+           const noiseFreq = 0.5;
+           const noiseAmp = 0.2;
+           const nx = noise3D(ox * noiseFreq + time * 0.3, oy * noiseFreq + time * 0.3, oz * noiseFreq + time * 0.3);
+           const ny = noise3D(oy * noiseFreq + time * 0.3, oz * noiseFreq + time * 0.3, ox * noiseFreq + time * 0.3);
+           const nz = noise3D(oz * noiseFreq + time * 0.3, ox * noiseFreq + time * 0.3, oy * noiseFreq + time * 0.3);
+           
+           // Expansion based on volume
+           // To scale "according to loudness", we multiply the position vector by a factor
+           let expansion = 1;
+           
+           if (state === 'recording' || state === 'speaking') {
+               // More volume = more expansion. 
+               // Add a base expansion + volume factor
+               expansion = 1 + volume * 0.8; 
+           } else {
+               // Breathing in idle
+               expansion = 1 + Math.sin(time) * 0.05;
+           }
 
-      // Center coordinates
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
-
-      // Base gradient for the orb
-      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
-      
-      if (state === 'idle') {
-        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)'); // Blue core
-        gradient.addColorStop(0.5, 'rgba(147, 197, 253, 0.4)'); // Light blue middle
-        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)'); // Transparent edge
-      } else if (state === 'recording') {
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.8)'); // Red core
-        gradient.addColorStop(0.5, 'rgba(252, 165, 165, 0.4)');
-        gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
-      } else if (state === 'processing') {
-        gradient.addColorStop(0, 'rgba(234, 179, 8, 0.8)'); // Yellow core
-        gradient.addColorStop(0.5, 'rgba(253, 224, 71, 0.4)');
-        gradient.addColorStop(1, 'rgba(234, 179, 8, 0)');
-      } else if (state === 'speaking') {
-        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.8)'); // Green core
-        gradient.addColorStop(0.5, 'rgba(134, 239, 172, 0.4)');
-        gradient.addColorStop(1, 'rgba(34, 197, 94, 0)');
-      }
-
-      // Draw main orb glow
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      
-      // Dynamic radius based on state
-      let radius = 100;
-      if (state === 'idle') {
-          radius = 100 + Math.sin(time) * 5;
-      } else if (state === 'recording') {
-          // If we had real audio data here, we'd use it. For now, simulate rapid movement
-          const dataArray = new Uint8Array(analyser ? analyser.frequencyBinCount : 0);
-          if (analyser) analyser.getByteFrequencyData(dataArray);
-          const volume = analyser ? dataArray.reduce((src, a) => src + a, 0) / dataArray.length : 0;
-          radius = 100 + (volume > 0 ? volume / 2 : Math.sin(time * 10) * 10);
-      } else if (state === 'processing') {
-          radius = 100 + Math.sin(time * 5) * 10;
-      } else if (state === 'speaking') {
-          // Simulate speaking pulses
-          radius = 100 + Math.sin(time * 8) * 15;
-      }
-
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw floating particles
-      particles.forEach((p, i) => {
-          const orbitRadius = 130 + Math.sin(time + p.offset) * 20;
-          const angle = time * p.speed + p.offset;
-          const px = cx + Math.cos(angle) * orbitRadius;
-          const py = cy + Math.sin(angle) * orbitRadius;
-          
-          ctx.globalAlpha = 0.6;
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(px, py, p.size, 0, Math.PI * 2);
-          ctx.fill();
-      });
-
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    // Set canvas size
-    canvas.width = 400;
-    canvas.height = 400;
-
-    draw();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [state, analyser]);
+           // Apply new positions
+           positionsArray[ix] = (ox + nx * noiseAmp) * expansion;
+           positionsArray[iy] = (oy + ny * noiseAmp) * expansion;
+           positionsArray[iz] = (oz + nz * noiseAmp) * expansion;
+       }
+       points.current.geometry.attributes.position.needsUpdate = true;
+       
+       // Slower rotation for the whole sphere
+       points.current.rotation.y = time * 0.05;
+       points.current.rotation.x = time * 0.02;
+    }
+  });
 
   return (
-    <div className="relative flex items-center justify-center">
-      {/* Background glow effects */}
-      <motion.div
-        className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full"
-        animate={{
-          scale: state === 'speaking' ? 1.2 : 1,
-          opacity: state === 'idle' ? 0.5 : 0.8,
-        }}
-        transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse' }}
+    <points ref={points}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+          args={[positions, 3]}
+        />
+      </bufferGeometry>
+      <PointMaterial
+        transparent
+        color={color}
+        size={0.06}
+        sizeAttenuation={true}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
       />
-      
-      <canvas
-        ref={canvasRef}
-        className="relative z-10 w-[300px] h-[300px] md:w-[400px] md:h-[400px]"
-      />
+    </points>
+  );
+}
+
+export default function AnimatedOrb({ state, analyser }: AnimatedOrbProps) {
+  return (
+    // Ensure the canvas takes full size of the container
+    <div className="w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
+        <Canvas camera={{ position: [0, 0, 4.5], fov: 60 }} gl={{ antialias: true, alpha: true }}>
+            {/* Ambient light for subtle fill if we had standard material */}
+            <ambientLight intensity={0.5} />
+            <ParticleSphere state={state} analyser={analyser} />
+        </Canvas>
     </div>
   );
 }
