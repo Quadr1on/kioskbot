@@ -1,44 +1,126 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Card } from '@/components/ui/card';
 
 interface LanguageSelectorProps {
   onSelect: (lang: 'en-IN' | 'ta-IN') => void;
 }
 
 export default function LanguageSelector({ onSelect }: LanguageSelectorProps) {
+  const styles = {
+    container: {
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      width: '100%',
+      maxWidth: '896px', // max-w-4xl
+      margin: '0 auto',
+      padding: '0 24px',
+    },
+    titleContainer: {
+      marginBottom: '48px',
+      textAlign: 'center' as const,
+    },
+    title: {
+      fontSize: '30px',
+      fontWeight: 700,
+      color: 'white',
+      marginBottom: '8px',
+    },
+    subtitle: {
+      display: 'block',
+      fontSize: '18px',
+      color: '#9ca3af',
+      fontWeight: 400,
+      marginTop: '8px',
+    },
+    grid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '32px',
+      width: '100%',
+    },
+    card: {
+      cursor: 'pointer',
+      backgroundColor: 'rgba(31, 41, 55, 0.5)', // bg-gray-800/50
+      border: '1px solid #374151', // border-gray-700
+      padding: '32px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '256px', // h-64
+      borderRadius: '24px', // rounded-xl check
+      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', // shadow-xl
+      transition: 'all 0.3s ease',
+    },
+    iconContainer: {
+      width: '80px',
+      height: '80px',
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: '24px',
+      transition: 'background-color 0.3s',
+    },
+    cardTitle: {
+      fontSize: '24px',
+      fontWeight: 600,
+      color: 'white',
+      margin: 0,
+    },
+    cardText: {
+      color: '#9ca3af',
+      marginTop: '8px',
+      margin: 0,
+    },
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full max-w-4xl mx-auto px-6">
-      <motion.h2 
+    <div style={styles.container}>
+      <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-3xl font-bold text-white mb-12 text-center"
+        style={styles.titleContainer}
       >
-        Select your preferred language
-        <span className="block text-lg text-gray-400 font-normal mt-2">
-            விரும்பிய மொழியைத் தேர்ந்தெடுக்கவும்
-        </span>
-      </motion.h2>
+        <h2 style={styles.title}>
+          Select your preferred language
+          <span style={styles.subtitle}>
+              விரும்பிய மொழியைத் தேர்ந்தெடுக்கவும்
+          </span>
+        </h2>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+      <div style={styles.grid}>
         <motion.div
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          style={{ width: '100%' }}
         >
-          <Card 
+          <div 
             onClick={() => onSelect('en-IN')}
-            className="group cursor-pointer bg-gray-800/50 hover:bg-gray-800 border-gray-700 hover:border-blue-500 transition-all p-8 flex flex-col items-center justify-center h-64 shadow-xl"
+            style={styles.card}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#1f2937'; // bg-gray-800
+              e.currentTarget.style.borderColor = '#3b82f6'; // border-blue-500
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(31, 41, 55, 0.5)';
+              e.currentTarget.style.borderColor = '#374151';
+            }}
           >
-            <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-blue-500/30 transition-colors">
-              <span className="text-4xl">🇬🇧</span>
+            <div style={{ ...styles.iconContainer, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
+              <span style={{ fontSize: '36px' }}>🇬🇧</span>
             </div>
-            <h3 className="text-2xl font-semibold text-white">English</h3>
-            <p className="text-gray-400 mt-2">Tap to speak</p>
-          </Card>
+            <h3 style={styles.cardTitle}>English</h3>
+            <p style={styles.cardText}>Tap to speak</p>
+          </div>
         </motion.div>
 
         <motion.div
@@ -47,17 +129,26 @@ export default function LanguageSelector({ onSelect }: LanguageSelectorProps) {
           transition={{ delay: 0.2 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          style={{ width: '100%' }}
         >
-          <Card 
+          <div 
             onClick={() => onSelect('ta-IN')}
-            className="group cursor-pointer bg-gray-800/50 hover:bg-gray-800 border-gray-700 hover:border-purple-500 transition-all p-8 flex flex-col items-center justify-center h-64 shadow-xl"
+            style={styles.card}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#1f2937';
+              e.currentTarget.style.borderColor = '#a855f7'; // border-purple-500
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(31, 41, 55, 0.5)';
+              e.currentTarget.style.borderColor = '#374151';
+            }}
           >
-            <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mb-6 group-hover:bg-purple-500/30 transition-colors">
-              <span className="text-4xl text-white font-bold">அ</span>
+            <div style={{ ...styles.iconContainer, backgroundColor: 'rgba(168, 85, 247, 0.2)' }}>
+              <span style={{ fontSize: '36px', fontWeight: 'bold', color: 'white' }}>அ</span>
             </div>
-            <h3 className="text-2xl font-semibold text-white">தமிழ் (Tamil)</h3>
-            <p className="text-gray-400 mt-2">பேச தட்டவும்</p>
-          </Card>
+            <h3 style={styles.cardTitle}>தமிழ் (Tamil)</h3>
+            <p style={styles.cardText}>பேச தட்டவும்</p>
+          </div>
         </motion.div>
       </div>
     </div>

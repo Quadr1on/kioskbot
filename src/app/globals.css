@@ -20,7 +20,7 @@ html {
 }
 
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), 'Segoe UI', system-ui, -apple-system, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
   /* Prevent pull-to-refresh on mobile */
@@ -60,15 +60,20 @@ input, textarea, select {
   user-select: text;
 }
 
-/* Focus styles for accessibility */
+/* Focus styles for accessibility - subtle for kiosk */
 :focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+  outline: 1px solid rgba(255, 255, 255, 0.3);
+  outline-offset: 1px;
 }
 
 /* Remove focus outline for mouse users */
 :focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Ensure no accidental outlines */
+*, *::before, *::after {
+  outline-color: transparent;
 }
 
 /* Animation for smooth transitions */
@@ -243,7 +248,7 @@ input, textarea, select {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;

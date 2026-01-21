@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mic, MicOff } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { X } from 'lucide-react';
 import AnimatedOrb from './AnimatedOrb';
 import LanguageSelector from './LanguageSelector';
 
@@ -23,6 +23,85 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const responseAudioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Styles matching the new design language
+  const styles = {
+    container: {
+      position: 'relative' as const,
+      minHeight: '100vh',
+      backgroundColor: 'black',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backgroundGlow: {
+      position: 'absolute' as const,
+      inset: 0,
+      background: 'radial-gradient(circle at center, rgba(30, 64, 175, 0.2), black, black)',
+      pointerEvents: 'none' as const,
+    },
+    exitButtonContainer: {
+      position: 'absolute' as const,
+      top: '24px',
+      left: '24px',
+      zIndex: 10,
+    },
+    exitButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      background: 'transparent',
+      border: 'none',
+      color: '#9ca3af',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: 500,
+      transition: 'color 0.2s',
+    },
+    languageBadgeContainer: {
+      position: 'absolute' as const,
+      top: '24px',
+      right: '24px',
+      zIndex: 10,
+    },
+    languageBadge: {
+      padding: '4px 12px',
+      backgroundColor: '#1f2937',
+      borderRadius: '9999px',
+      fontSize: '12px',
+      color: '#d1d5db',
+      border: '1px solid #374151',
+    },
+    mainContent: {
+      position: 'relative' as const,
+      zIndex: 0,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      maxWidth: '512px',
+      padding: '0 24px',
+    },
+    orbContainer: {
+      cursor: 'pointer',
+      transform: 'scale(1)',
+      transition: 'transform 0.3s',
+    },
+    statusTextContainer: {
+      marginTop: '48px',
+      textAlign: 'center' as const,
+    },
+    statusText: {
+      color: '#9ca3af',
+      fontSize: '18px',
+      fontWeight: 500,
+      letterSpacing: '0.025em',
+      margin: 0,
+    },
+  };
 
   // Initialize Audio Context
   const initAudioContext = () => {
@@ -131,9 +210,7 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       const fullResponse = data.text || '';
 
       console.log('DEBUG: VoiceMode received response:', fullResponse);
-      console.log('DEBUG: Tool calls:', data.toolCalls);
-      console.log('DEBUG: Tool results:', data.toolResults);
-
+      
       setConversationHistory([...newHistory, { role: 'assistant', content: fullResponse }]);
 
       if (fullResponse && fullResponse.trim().length > 0) {
@@ -166,10 +243,6 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
           responseAudioRef.current = audio;
           
           setStatus('speaking');
-          
-          // Connect audio output to analyser for visualization if supported
-          // Note: connecting Audio element to Web Audio API requires CORS / interaction
-          // For simplicity/robustness, we'll simulate 'speaking' state in AnimatedOrb
           
           audio.onended = () => setStatus('idle');
           await audio.play();
@@ -206,14 +279,14 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
 
   if (!hasSelectedLanguage) {
     return (
-        <div className="relative min-h-screen bg-black overflow-hidden flex flex-col">
-            <div className="absolute top-6 left-6 z-10">
+        <div style={styles.container}>
+            <div style={styles.exitButtonContainer}>
                 <button 
                     onClick={onSwitchToChat}
-                    className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+                    style={styles.exitButton}
                 >
-                    <X className="w-6 h-6" />
-                    <span className="text-sm font-medium">Exit Voice Mode</span>
+                    <X size={24} />
+                    <span>Exit Voice Mode</span>
                 </button>
             </div>
             <LanguageSelector onSelect={(lang) => {
@@ -225,32 +298,36 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   }
 
   return (
-    <div className="relative min-h-screen bg-black overflow-hidden flex flex-col items-center justify-center">
+    <div style={styles.container}>
       {/* Background Ambient Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-black to-black pointer-events-none" />
+      <div style={styles.backgroundGlow} />
 
       {/* Header */}
-      <div className="absolute top-6 left-6 z-10">
+      <div style={styles.exitButtonContainer}>
           <button 
               onClick={onSwitchToChat}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+              style={styles.exitButton}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
           >
-              <X className="w-6 h-6" />
-              <span className="text-sm font-medium">Exit</span>
+              <X size={24} />
+              <span>Exit</span>
           </button>
       </div>
 
-      <div className="absolute top-6 right-6 z-10">
-          <span className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-300 border border-gray-700">
+      <div style={styles.languageBadgeContainer}>
+          <span style={styles.languageBadge}>
               {language === 'en-IN' ? 'English' : 'தமிழ்'}
           </span>
       </div>
 
       {/* Main Content */}
-      <main className="relative z-0 flex flex-col items-center justify-center w-full max-w-lg px-6">
+      <main style={styles.mainContent}>
         <div 
             onClick={toggleRecording}
-            className="cursor-pointer transform hover:scale-105 transition-transform duration-300"
+            style={styles.orbContainer}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
             <AnimatedOrb 
                 state={status} 
@@ -261,9 +338,9 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
         <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-12 text-center"
+            style={styles.statusTextContainer}
         >
-            <p className="text-gray-400 text-lg font-medium tracking-wide">
+            <p style={styles.statusText}>
                 {status === 'idle' && 'Tap to speak'}
                 {status === 'recording' && 'Listening... Tap to stop'}
                 {status === 'processing' && 'Thinking...'}
