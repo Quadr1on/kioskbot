@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { createNoise3D } from 'simplex-noise';
 
 interface AnimatedOrbProps {
-  state: 'idle' | 'recording' | 'processing' | 'speaking';
+  state: 'idle' | 'greeting' | 'recording' | 'processing' | 'speaking';
   analyser?: AnalyserNode | null;
 }
 
@@ -45,6 +45,7 @@ function ParticleSphere({ state, analyser }: { state: string, analyser?: Analyse
     switch (state) {
       case 'recording': return '#ef4444'; // Red
       case 'processing': return '#eab308'; // Yellow
+      case 'greeting':
       case 'speaking': return '#22c55e'; // Green
       case 'idle':
       default: return '#3b82f6'; // Blue
@@ -65,7 +66,7 @@ function ParticleSphere({ state, analyser }: { state: string, analyser?: Analyse
         // Normalize and scale up for effect. Average is usually 0-255.
         // We want a value roughly 0 to 1.5
         volume = Math.max(0, (avg / 128) - 0.1); 
-    } else if (state === 'speaking') {
+    } else if (state === 'speaking' || state === 'greeting') {
          // Simulate talking animation
          volume = (Math.sin(time * 8) + 1) * 0.2;
     } else if (state === 'processing') {
@@ -103,7 +104,7 @@ function ParticleSphere({ state, analyser }: { state: string, analyser?: Analyse
            // To scale "according to loudness", we multiply the position vector by a factor
            let expansion = 1;
            
-           if (state === 'recording' || state === 'speaking') {
+           if (state === 'recording' || state === 'speaking' || state === 'greeting') {
                // More volume = more expansion. 
                // Add a base expansion + volume factor
                expansion = 1 + volume * 0.8; 

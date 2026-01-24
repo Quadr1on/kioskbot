@@ -12,9 +12,10 @@ interface VoiceModeProps {
 
 export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const [hasSelectedLanguage, setHasSelectedLanguage] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'speaking'>('idle');
+  const [status, setStatus] = useState<'idle' | 'greeting' | 'recording' | 'processing' | 'speaking'>('idle');
   const [language, setLanguage] = useState<'en-IN' | 'ta-IN'>('en-IN');
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
+  const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   
   // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -23,6 +24,12 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const responseAudioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  
+  // Silence detection refs
+  const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const silentFramesRef = useRef<number>(0);
+  const SILENCE_THRESHOLD = 15; // Audio level threshold (0-255)
+  const SILENCE_FRAMES_REQUIRED = 10; // ~500ms at 50ms intervals
 
   // Styles matching the new design language
   const styles = {
@@ -139,6 +146,13 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       };
 
       mediaRecorder.onstop = async () => {
+        // Clear silence detection
+        if (silenceCheckIntervalRef.current) {
+          clearInterval(silenceCheckIntervalRef.current);
+          silenceCheckIntervalRef.current = null;
+        }
+        silentFramesRef.current = 0;
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         
         // Stop all tracks
@@ -147,12 +161,43 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
             streamRef.current = null;
         }
 
-        setStatus('processing');
-        await processAudio(audioBlob);
+        // Only process if we have audio data
+        if (audioChunksRef.current.length > 0) {
+          setStatus('processing');
+          await processAudio(audioBlob);
+        } else {
+          // No audio captured, restart recording
+          startRecording();
+        }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(100); // Collect data every 100ms for better chunking
       setStatus('recording');
+      
+      // Start silence detection
+      silentFramesRef.current = 0;
+      silenceCheckIntervalRef.current = setInterval(() => {
+        if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+          return;
+        }
+        
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        
+        if (average < SILENCE_THRESHOLD) {
+          silentFramesRef.current++;
+          // Check if we've had enough silent frames (500ms worth)
+          if (silentFramesRef.current >= SILENCE_FRAMES_REQUIRED && audioChunksRef.current.length > 0) {
+            // We have silence and some recorded audio - stop recording
+            stopRecording();
+          }
+        } else {
+          // Reset silence counter when voice is detected
+          silentFramesRef.current = 0;
+        }
+      }, 50); // Check every 50ms
+      
     } catch (error) {
       console.error('Error accessing microphone:', error);
       alert('Could not access microphone');
@@ -225,7 +270,7 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
     }
   };
 
-  const playTTS = async (text: string) => {
+  const playTTS = async (text: string, autoRestartRecording: boolean = true) => {
     try {
       const response = await fetch('/api/voice/tts', {
         method: 'POST',
@@ -244,17 +289,80 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
           
           setStatus('speaking');
           
-          audio.onended = () => setStatus('idle');
+          audio.onended = () => {
+            setStatus('idle');
+            // Auto-restart recording after speaking for continuous conversation
+            if (autoRestartRecording) {
+              setTimeout(() => startRecording(), 300);
+            }
+          };
           await audio.play();
         } else {
             setStatus('idle');
+            if (autoRestartRecording) {
+              setTimeout(() => startRecording(), 300);
+            }
         }
       } else {
           setStatus('idle');
+          if (autoRestartRecording) {
+            setTimeout(() => startRecording(), 300);
+          }
       }
     } catch (error) {
       console.error('TTS error:', error);
       setStatus('idle');
+      if (autoRestartRecording) {
+        setTimeout(() => startRecording(), 300);
+      }
+    }
+  };
+
+  // Play greeting when entering voice mode
+  const playGreeting = async (lang: 'en-IN' | 'ta-IN') => {
+    const greetingText = lang === 'en-IN' 
+      ? 'Welcome to SIMS Assistant. How can I help you today?' 
+      : 'SIMS உதவியாளருக்கு வரவேற்கிறோம். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?';
+    
+    try {
+      setStatus('greeting');
+      const response = await fetch('/api/voice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: greetingText, language: lang }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.audio) {
+          if (responseAudioRef.current) {
+            responseAudioRef.current.pause();
+          }
+          const audio = new Audio(`data:audio/wav;base64,${data.audio}`);
+          responseAudioRef.current = audio;
+          
+          audio.onended = () => {
+            setHasPlayedGreeting(true);
+            setStatus('idle');
+            // Auto-start recording after greeting
+            setTimeout(() => startRecording(), 300);
+          };
+          await audio.play();
+        } else {
+          setHasPlayedGreeting(true);
+          setStatus('idle');
+          setTimeout(() => startRecording(), 300);
+        }
+      } else {
+        setHasPlayedGreeting(true);
+        setStatus('idle');
+        setTimeout(() => startRecording(), 300);
+      }
+    } catch (error) {
+      console.error('Greeting TTS error:', error);
+      setHasPlayedGreeting(true);
+      setStatus('idle');
+      setTimeout(() => startRecording(), 300);
     }
   };
 
@@ -272,7 +380,7 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
         startRecording();
     } else if (status === 'recording') {
         stopRecording();
-    } else if (status === 'speaking') {
+    } else if (status === 'speaking' || status === 'greeting') {
         stopSpeaking();
     }
   };
@@ -292,6 +400,8 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
             <LanguageSelector onSelect={(lang) => {
                 setLanguage(lang);
                 setHasSelectedLanguage(true);
+                // Play greeting after language selection
+                playGreeting(lang);
             }} />
         </div>
     );
@@ -341,8 +451,9 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
             style={styles.statusTextContainer}
         >
             <p style={styles.statusText}>
-                {status === 'idle' && 'Tap to speak'}
-                {status === 'recording' && 'Listening... Tap to stop'}
+                {status === 'idle' && 'Ready to listen'}
+                {status === 'greeting' && 'Welcome...'}
+                {status === 'recording' && 'Listening...'}
                 {status === 'processing' && 'Thinking...'}
                 {status === 'speaking' && 'Speaking... Tap to interrupt'}
             </p>

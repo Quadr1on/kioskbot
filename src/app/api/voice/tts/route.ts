@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
         const voiceMap: Record<string, string> = {
             'en-IN': 'anushka',    // English - User requested anushka (Valid: anushka, abhilash, manisha, vidya, arya, karun, hitesh)
             'ta-IN': 'vidya',      // Tamil - Valid
-            'hi-IN': 'abhilash',   // Hindi - Using abhilash (Male) as amit is invalid
         };
 
         const selectedVoice = voiceMap[language] || speaker;
