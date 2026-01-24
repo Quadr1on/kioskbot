@@ -14,11 +14,18 @@ const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk a
 4. **Department Guidance**: Based on symptoms, suggest which department to visit and offer to book appointments.
 5. **Doctor Information**: Provide details about doctors, their specializations, and availability.
 
+## CRITICAL: CONVERSATION CONTEXT AWARENESS
+Before EVERY response, you MUST analyze the conversation history to understand what flow you are currently in:
+- If the previous messages show you asked "May I have your full name?" and the user responded with a name → You are in APPOINTMENT BOOKING STEP 2, do NOT use findPatient tool, just acknowledge the name and ask for phone number.
+- If you asked for a phone number and user provided digits → You are in APPOINTMENT BOOKING STEP 3, ask about department.
+- ONLY use findPatient tool when the user explicitly asks to FIND or LOCATE an admitted patient.
+- When collecting information during booking (name, phone, department), NEVER call findPatient - just store the info and proceed to next step.
+
 ## APPOINTMENT BOOKING FLOW
 When a user wants to book an appointment, you MUST follow these steps IN ORDER. Ask ONE question at a time and wait for the user's response before proceeding:
 
 **Step 1 - Name**: "I will help you book an appointment. May I have your full name please?"
-**Step 2 - Phone**: After receiving name, ask: "Thank you, [name]. What is your phone number?"
+**Step 2 - Phone**: After receiving name, say: "Thank you, [name]. What is your phone number?" (DO NOT call any tool here)
 **Step 3 - Department**: After receiving phone, ask: "Which department would you like to visit? We have Cardiology, Neurology, Orthopedics, General Medicine, Pediatrics, Gynecology, Dermatology, ENT, Ophthalmology, and Gastroenterology."
 **Step 4 - Show Doctors**: When they choose a department, use the getDoctorAvailability tool to get doctors in that department, then list them with their specializations.
 **Step 5 - Choose Doctor**: Ask the user to choose a doctor from the list.
@@ -30,6 +37,7 @@ IMPORTANT:
 - Keep track of all information provided (name, phone, department, doctor, slot) throughout the conversation
 - If the user skips a step or provides incorrect info, gently ask again
 - Always confirm the booking details before finalizing
+- NEVER confuse booking flow with patient search - these are completely separate use cases
 
 Guidelines:
 - Be warm, patient, and speak clearly (many users are elderly)
@@ -42,6 +50,7 @@ Guidelines:
 - For symptom-based queries, suggest departments but remind users this is not a medical diagnosis
 
 Current hospital visiting hours: 10:00 AM - 12:00 PM and 4:00 PM - 7:00 PM`;
+
 
 export async function POST(req: Request) {
     const { messages, stream = true } = await req.json();
@@ -181,12 +190,19 @@ export async function POST(req: Request) {
         }),
 
         bookAppointment: tool({
-            description: 'Book an appointment with a doctor for a patient. Use this ONLY after collecting: patient name, phone number, doctor ID, and slot ID.',
+            description: `Book an appointment with a doctor for a patient. 
+CRITICAL: DO NOT call this tool until you have collected ALL of the following from the user through conversation:
+1. Patient's full name (collected in Step 1)
+2. Phone number (collected in Step 2)  
+3. Doctor ID (obtained after user selects a doctor from the list in Step 5)
+4. Slot ID (obtained after user selects a time slot in Step 7)
+
+If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, continue the conversation to collect the missing information.`,
             inputSchema: z.object({
-                patientName: z.string().describe('Full name of the patient'),
-                phone: z.string().describe('Phone number of the patient'),
-                slotId: z.number().describe('ID of the time slot to book'),
-                doctorId: z.number().describe('ID of the doctor'),
+                patientName: z.string().min(1).describe('Full name of the patient - REQUIRED, must be collected from user'),
+                phone: z.string().min(1).describe('Phone number of the patient - REQUIRED, must be collected from user'),
+                slotId: z.number().positive().describe('ID of the time slot to book - REQUIRED, user must select from available slots'),
+                doctorId: z.number().positive().describe('ID of the doctor - REQUIRED, user must select a doctor first'),
             }),
             execute: async ({ patientName, phone, slotId, doctorId }) => {
                 console.log('DEBUG: bookAppointment called with:', { patientName, phone, slotId, doctorId });

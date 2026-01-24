@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import AnimatedOrb from './AnimatedOrb';
@@ -17,6 +17,14 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   
+  // Use a ref to track conversation history reliably (avoids React state update race conditions)
+  const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
+  
+  // Pre-loaded greeting audio refs
+  const greetingAudioEnRef = useRef<string | null>(null);
+  const greetingAudioTaRef = useRef<string | null>(null);
+  const greetingsLoadedRef = useRef(false);
+  
   // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -28,8 +36,51 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   // Silence detection refs
   const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const silentFramesRef = useRef<number>(0);
+  const hasSpeechStartedRef = useRef<boolean>(false); // Track if user has started speaking
   const SILENCE_THRESHOLD = 15; // Audio level threshold (0-255)
-  const SILENCE_FRAMES_REQUIRED = 10; // ~500ms at 50ms intervals
+  const SPEECH_THRESHOLD = 25; // Higher threshold to detect actual speech
+  const SILENCE_FRAMES_REQUIRED = 15; // ~750ms at 50ms intervals (more forgiving)
+  
+  // Pre-fetch greeting audio on component mount
+  useEffect(() => {
+    const preloadGreetings = async () => {
+      if (greetingsLoadedRef.current) return;
+      greetingsLoadedRef.current = true;
+      
+      // Pre-fetch English greeting
+      const enGreeting = 'Welcome to SIMS Assistant. How can I help you today?';
+      const taGreeting = 'SIMS உதவியாளருக்கு வரவேற்கிறோம். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?';
+      
+      try {
+        const [enResponse, taResponse] = await Promise.all([
+          fetch('/api/voice/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: enGreeting, language: 'en-IN' }),
+          }),
+          fetch('/api/voice/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: taGreeting, language: 'ta-IN' }),
+          }),
+        ]);
+        
+        if (enResponse.ok) {
+          const enData = await enResponse.json();
+          if (enData.audio) greetingAudioEnRef.current = enData.audio;
+        }
+        if (taResponse.ok) {
+          const taData = await taResponse.json();
+          if (taData.audio) greetingAudioTaRef.current = taData.audio;
+        }
+        console.log('DEBUG: Greeting audio pre-loaded');
+      } catch (error) {
+        console.error('Failed to pre-load greetings:', error);
+      }
+    };
+    
+    preloadGreetings();
+  }, []);
 
   // Styles matching the new design language
   const styles = {
@@ -174,8 +225,10 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       mediaRecorder.start(100); // Collect data every 100ms for better chunking
       setStatus('recording');
       
-      // Start silence detection
+      // Start silence detection - but only trigger AFTER user starts speaking
       silentFramesRef.current = 0;
+      hasSpeechStartedRef.current = false; // Reset speech detection flag
+      
       silenceCheckIntervalRef.current = setInterval(() => {
         if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
           return;
@@ -185,11 +238,25 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
         analyserRef.current.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         
+        // First, check if user has started speaking
+        if (!hasSpeechStartedRef.current) {
+          if (average >= SPEECH_THRESHOLD) {
+            // User has started speaking!
+            hasSpeechStartedRef.current = true;
+            silentFramesRef.current = 0;
+            console.log('DEBUG: Speech detected, now tracking silence');
+          }
+          // If user hasn't started speaking yet, don't do anything - keep listening
+          return;
+        }
+        
+        // User has started speaking - now track silence
         if (average < SILENCE_THRESHOLD) {
           silentFramesRef.current++;
-          // Check if we've had enough silent frames (500ms worth)
+          // Check if we've had enough silent frames after speech
           if (silentFramesRef.current >= SILENCE_FRAMES_REQUIRED && audioChunksRef.current.length > 0) {
-            // We have silence and some recorded audio - stop recording
+            // User spoke and then stopped - process the audio
+            console.log('DEBUG: Silence detected after speech, stopping recording');
             stopRecording();
           }
         } else {
@@ -238,8 +305,13 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   };
 
   const handleTranscript = async (text: string) => {
-    const newHistory = [...conversationHistory, { role: 'user', content: text }];
+    // Use ref for reliable history tracking (avoids React state race conditions)
+    const previousHistory = [...conversationHistoryRef.current]; // Save for rollback
+    const newHistory = [...previousHistory, { role: 'user', content: text }];
+    conversationHistoryRef.current = newHistory;
     setConversationHistory(newHistory);
+    
+    console.log('DEBUG: Sending conversation history to LLM:', JSON.stringify(newHistory, null, 2));
 
     try {
       // Use non-streaming mode for voice - waits for complete response including tool results
@@ -249,24 +321,44 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
         body: JSON.stringify({ messages: newHistory, stream: false }),
       });
 
-      if (!chatResponse.ok) throw new Error('Chat failed');
+      if (!chatResponse.ok) {
+        console.error('Chat API error:', chatResponse.status);
+        throw new Error(`Chat failed with status ${chatResponse.status}`);
+      }
 
       const data = await chatResponse.json();
       const fullResponse = data.text || '';
 
       console.log('DEBUG: VoiceMode received response:', fullResponse);
       
-      setConversationHistory([...newHistory, { role: 'assistant', content: fullResponse }]);
+      // Update both ref and state with the assistant's response
+      const updatedHistory = [...newHistory, { role: 'assistant', content: fullResponse }];
+      conversationHistoryRef.current = updatedHistory;
+      setConversationHistory(updatedHistory);
 
       if (fullResponse && fullResponse.trim().length > 0) {
         await playTTS(fullResponse);
       } else {
         console.log('DEBUG: No text response from LLM');
         setStatus('idle');
+        // Restart recording even on empty response
+        setTimeout(() => startRecording(), 300);
       }
     } catch (error) {
       console.error('Chat error:', error);
-      setStatus('idle');
+      
+      // Rollback conversation history to before this message
+      // This prevents having orphan user messages without assistant responses
+      conversationHistoryRef.current = previousHistory;
+      setConversationHistory(previousHistory);
+      
+      // Play an error message to the user
+      const errorMessage = language === 'en-IN' 
+        ? 'Sorry, I had trouble processing that. Could you please repeat?' 
+        : 'மன்னிக்கவும், அதை செயலாக்குவதில் சிக்கல் ஏற்பட்டது. தயவுசெய்து மீண்டும் சொல்ல முடியுமா?';
+      
+      setStatus('speaking');
+      await playTTS(errorMessage, true);
     }
   };
 
@@ -318,14 +410,45 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
     }
   };
 
-  // Play greeting when entering voice mode
+  // Play greeting when entering voice mode - uses pre-loaded audio for instant playback
   const playGreeting = async (lang: 'en-IN' | 'ta-IN') => {
+    setStatus('greeting');
+    
+    // Try to use pre-loaded audio first
+    const preloadedAudio = lang === 'en-IN' ? greetingAudioEnRef.current : greetingAudioTaRef.current;
+    
+    if (preloadedAudio) {
+      // Use pre-loaded audio - instant playback!
+      console.log('DEBUG: Using pre-loaded greeting audio');
+      if (responseAudioRef.current) {
+        responseAudioRef.current.pause();
+      }
+      const audio = new Audio(`data:audio/wav;base64,${preloadedAudio}`);
+      responseAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setHasPlayedGreeting(true);
+        setStatus('idle');
+        // Auto-start recording after greeting
+        setTimeout(() => startRecording(), 300);
+      };
+      
+      try {
+        await audio.play();
+        return;
+      } catch (error) {
+        console.error('Failed to play pre-loaded audio:', error);
+        // Fall through to fetch fresh audio
+      }
+    }
+    
+    // Fallback: fetch greeting audio if pre-load failed
+    console.log('DEBUG: Pre-loaded audio not available, fetching fresh');
     const greetingText = lang === 'en-IN' 
       ? 'Welcome to SIMS Assistant. How can I help you today?' 
       : 'SIMS உதவியாளருக்கு வரவேற்கிறோம். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?';
     
     try {
-      setStatus('greeting');
       const response = await fetch('/api/voice/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -344,7 +467,6 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
           audio.onended = () => {
             setHasPlayedGreeting(true);
             setStatus('idle');
-            // Auto-start recording after greeting
             setTimeout(() => startRecording(), 300);
           };
           await audio.play();
