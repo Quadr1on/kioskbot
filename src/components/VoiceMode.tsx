@@ -17,6 +17,12 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
   const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
   
+  // Transcript state for display
+  const [userTranscript, setUserTranscript] = useState<string>('');
+  const [aiTranscript, setAiTranscript] = useState<string>('');
+  const [currentSpeaker, setCurrentSpeaker] = useState<'user' | 'ai' | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
   // Use a ref to track conversation history reliably (avoids React state update race conditions)
   const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
   
@@ -159,6 +165,50 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       letterSpacing: '0.025em',
       margin: 0,
     },
+    transcriptContainer: {
+      marginTop: '24px',
+      textAlign: 'center' as const,
+      maxWidth: '400px',
+      minHeight: '60px',
+    },
+    transcriptText: {
+      color: '#e5e7eb',
+      fontSize: '16px',
+      lineHeight: 1.6,
+      display: 'flex',
+      flexWrap: 'wrap' as const,
+      justifyContent: 'center',
+      gap: '6px',
+    },
+    transcriptWord: {
+      display: 'inline-block',
+    },
+    speakerLabel: {
+      color: '#6b7280',
+      fontSize: '12px',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.1em',
+      marginBottom: '8px',
+    },
+  };
+
+  // Animation variants for word-by-word reveal
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: 0.06,
+      },
+    },
+  };
+
+  const wordVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] as const }
+    },
   };
 
   // Initialize Audio Context
@@ -297,6 +347,12 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
           return;
       }
 
+      // Set user transcript for display animation
+      setCurrentSpeaker('user');
+      setUserTranscript(text);
+      setAiTranscript('');
+      setIsAnimating(true);
+
       await handleTranscript(text);
     } catch (error) {
       console.error('Processing error:', error);
@@ -379,10 +435,17 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
           const audio = new Audio(`data:audio/wav;base64,${data.audio}`);
           responseAudioRef.current = audio;
           
+          // Set AI transcript for display animation
+          setCurrentSpeaker('ai');
+          setUserTranscript('');
+          setAiTranscript(text);
+          setIsAnimating(true);
+          
           setStatus('speaking');
           
           audio.onended = () => {
             setStatus('idle');
+            setIsAnimating(false);
             // Auto-restart recording after speaking for continuous conversation
             if (autoRestartRecording) {
               setTimeout(() => startRecording(), 300);
@@ -580,6 +643,35 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
                 {status === 'speaking' && 'Speaking... Tap to interrupt'}
             </p>
         </motion.div>
+
+        {/* Transcript Display */}
+        {(userTranscript || aiTranscript) && (
+          <div style={styles.transcriptContainer}>
+            <p style={styles.speakerLabel}>
+              {currentSpeaker === 'user' ? 'You said:' : 'Assistant:'}
+            </p>
+            <motion.div
+              key={`${currentSpeaker}-${userTranscript || aiTranscript}`}
+              variants={containerVariants}
+              initial="hidden"
+              animate={isAnimating ? "visible" : "hidden"}
+              style={styles.transcriptText}
+            >
+              {(currentSpeaker === 'user' ? userTranscript : aiTranscript)
+                .split(' ')
+                .filter(word => word.length > 0)
+                .map((word, index) => (
+                  <motion.span
+                    key={index}
+                    variants={wordVariants}
+                    style={styles.transcriptWord}
+                  >
+                    {word}
+                  </motion.span>
+                ))}
+            </motion.div>
+          </div>
+        )}
       </main>
     </div>
   );

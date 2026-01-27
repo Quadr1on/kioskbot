@@ -81,19 +81,21 @@ export default function MessageBubble({ role, content, isLoading }: MessageBubbl
       marginBottom: '16px',
     },
     bubble: {
-      maxWidth: '80%',
-      padding: '16px 20px',
-      borderRadius: isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+      maxWidth: '70%',
+      padding: '12px 16px',
+      borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
       background: isUser 
         ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' 
         : '#212121',
       color: 'white',
+      wordBreak: 'break-word' as const,
     },
     text: {
-      fontSize: '16px',
-      lineHeight: '1.6',
+      fontSize: '15px',
+      lineHeight: '1.5',
       margin: 0,
       whiteSpace: 'pre-wrap' as const,
+      wordBreak: 'break-word' as const,
     },
     loadingContainer: {
       display: 'flex',

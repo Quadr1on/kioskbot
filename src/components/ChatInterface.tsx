@@ -182,23 +182,23 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       alignItems: 'center',
       height: '100%',
       width: '100%',
-      padding: '24px',
+      padding: '0',
     },
     chatBox: {
       display: 'flex',
       flexDirection: 'column' as const,
-      width: '75%',
+      width: '100%',
       maxWidth: '900px',
       height: '100%',
       backgroundColor: '#1a1a1a',
-      borderRadius: '24px',
+      borderRadius: '0',
       overflow: 'hidden',
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '24px 32px',
+      padding: '16px',
       borderBottom: '1px solid #2a2a2a',
     },
     title: {
@@ -228,7 +228,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
     messagesArea: {
       flex: 1,
       overflowY: 'auto' as const,
-      padding: '24px 32px',
+      padding: '16px',
     },
     welcomeContainer: {
       display: 'flex',
@@ -261,25 +261,29 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
     },
     quickActions: {
       display: 'flex',
-      gap: '12px',
-      padding: '16px 32px',
+      gap: '6px',
+      padding: '10px 12px',
       overflowX: 'auto' as const,
       borderTop: '1px solid #2a2a2a',
+      flexWrap: 'wrap' as const,
+      justifyContent: 'center',
     },
     quickActionButton: {
-      padding: '12px 20px',
+      padding: '8px 14px',
       backgroundColor: '#212121',
       border: '1px solid #3a3a3a',
-      borderRadius: '24px',
+      borderRadius: '20px',
       color: 'white',
-      fontSize: '14px',
+      fontSize: '12px',
       fontWeight: 500,
       cursor: 'pointer',
       whiteSpace: 'nowrap' as const,
       transition: 'all 0.2s',
+      flex: '0 1 auto',
+      minWidth: 'fit-content',
     },
     inputArea: {
-      padding: '16px 32px 32px',
+      padding: '12px 16px 24px',
     },
     inputContainer: {
       display: 'flex',
@@ -325,7 +329,30 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
         <div style={styles.chatBox}>
           {/* Header */}
           <header style={styles.header}>
-            <h1 style={styles.title}>SIMS AI</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={() => window.location.href = '/'}
+                style={{
+                  padding: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#9ca3af',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+              >
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h1 style={styles.title}>SIMS AI</h1>
+            </div>
             
             <div style={{ position: 'relative' }}>
               <button
