@@ -9,16 +9,12 @@ interface MessageBubbleProps {
   isLoading?: boolean;
 }
 
-// Parse markdown content supporting bold (**text**) and bullet points (- text)
 function parseContent(text: string) {
-  // Split content by lines to handle bullet points
   const lines = text.split('\n');
   
   return lines.map((line, lineIndex) => {
-    // Check if line is a bullet point (starts with "- " or "* ")
     const isBullet = line.trim().match(/^[-*]\s+(.+)/);
     
-    // Process bold text within the line
     const parts = line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         const boldText = part.slice(2, -2);
@@ -31,12 +27,9 @@ function parseContent(text: string) {
       return part;
     });
 
-    // If it's a bullet point, render as a list item style
     if (isBullet) {
-      // Remove the bullet marker for rendering
-       const contentWithoutBullet = isBullet[1];
-       // Re-parse the content inside bullet for bold text
-       const bulletParts = contentWithoutBullet.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
+      const contentWithoutBullet = isBullet[1];
+      const bulletParts = contentWithoutBullet.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
         if (part.startsWith('**') && part.endsWith('**')) {
           const boldText = part.slice(2, -2);
           return (
@@ -49,21 +42,31 @@ function parseContent(text: string) {
       });
 
       return (
-        <div key={lineIndex} style={{ display: 'flex', alignItems: 'flex-start', marginLeft: '12px', marginBottom: '4px' }}>
-          <span style={{ marginRight: '8px', fontSize: '18px', lineHeight: '1.2' }}>•</span>
+        <div key={lineIndex} style={{ 
+          display: 'flex', 
+          alignItems: 'flex-start', 
+          marginLeft: '8px', 
+          marginBottom: '6px',
+          fontSize: '15px',
+          lineHeight: '1.6',
+        }}>
+          <span style={{ marginRight: '10px', fontSize: '16px', lineHeight: '1.2', flexShrink: 0, marginTop: '2px' }}>•</span>
           <span style={{ flex: 1 }}>{bulletParts}</span>
         </div>
       );
     }
 
-    // Regular line, render properly with line breaks if needed
-    // If it's empty, render a break
     if (line.trim() === '') {
-      return <div key={lineIndex} style={{ height: '8px' }} />;
+      return <div key={lineIndex} style={{ height: '10px' }} />;
     }
 
     return (
-      <div key={lineIndex} style={{ marginBottom: '4px' }}>
+      <div key={lineIndex} style={{ 
+        marginBottom: '4px',
+        fontSize: '15px',
+        lineHeight: '1.6',
+        fontWeight: 500,
+      }}>
         {parts}
       </div>
     );
@@ -73,73 +76,78 @@ function parseContent(text: string) {
 export default function MessageBubble({ role, content, isLoading }: MessageBubbleProps) {
   const isUser = role === 'user';
 
-  // Inline styles for reliable rendering
-  const styles = {
-    container: {
-      display: 'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom: '16px',
-    },
-    bubble: {
-      maxWidth: '70%',
-      padding: '12px 16px',
-      borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-      background: isUser 
-        ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' 
-        : '#212121',
-      color: 'white',
-      wordBreak: 'break-word' as const,
-    },
-    text: {
-      fontSize: '15px',
-      lineHeight: '1.5',
-      margin: 0,
-      whiteSpace: 'pre-wrap' as const,
-      wordBreak: 'break-word' as const,
-    },
-    loadingContainer: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '8px 4px',
-    },
-    loadingDot: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      backgroundColor: '#6B7280',
-    },
-  };
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      style={styles.container}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      style={{
+        display: 'flex',
+        justifyContent: isUser ? 'flex-end' : 'flex-start',
+        marginBottom: '16px',
+      }}
     >
-      <div style={styles.bubble}>
+      <div
+        style={{
+          maxWidth: '70%',
+          padding: isUser ? '10px 16px' : '12px 16px',
+          borderRadius: isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+          background: isUser 
+            ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
+            : '#f3f4f6',
+          color: isUser ? 'white' : '#1f2937',
+          wordBreak: 'break-word',
+          boxShadow: isUser 
+            ? '0 4px 12px rgba(59, 130, 246, 0.25)' 
+            : '0 2px 8px rgba(0, 0, 0, 0.06)',
+          transition: 'all 0.2s',
+        }}
+      >
         {isLoading ? (
-          // iMessage-style typing indicator
-          <div style={styles.loadingContainer}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 4px',
+          }}>
             <motion.span
-              style={styles.loadingDot}
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#9ca3af',
+              }}
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
             />
             <motion.span
-              style={styles.loadingDot}
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#9ca3af',
+              }}
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
             />
             <motion.span
-              style={styles.loadingDot}
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#9ca3af',
+              }}
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
             />
           </div>
         ) : (
-          <div style={styles.text}>{parseContent(content)}</div>
+          <div style={{
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}>
+            {parseContent(content)}
+          </div>
         )}
       </div>
     </motion.div>

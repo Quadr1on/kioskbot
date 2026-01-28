@@ -14,20 +14,18 @@ interface ChatInterfaceProps {
   onSwitchToVoice?: () => void;
 }
 
-// Quick action buttons for common tasks
 const QUICK_ACTIONS = [
-  { label: 'Book Appointment', message: 'I want to book an appointment' },
-  { label: 'Find Patient', message: 'Find a patient by name' },
-  { label: 'Visiting Hours', message: 'What are the visiting hours?' },
+  { label: '📅 Book Appointment', message: 'I want to book an appointment' },
+  { label: '🔍 Find Patient', message: 'Find a patient by name' },
+  { label: '🏥 Visiting Hours', message: 'What are the visiting hours?' },
 ];
 
-// Appointment flow quick actions
 const APPOINTMENT_ACTIONS = {
   departments: [
-    { label: 'Cardiology', message: 'Cardiology' },
-    { label: 'Neurology', message: 'Neurology' },
-    { label: 'Orthopedics', message: 'Orthopedics' },
-    { label: 'General Medicine', message: 'General Medicine' },
+    { label: '❤️ Cardiology', message: 'Cardiology' },
+    { label: '🧠 Neurology', message: 'Neurology' },
+    { label: '🦴 Orthopedics', message: 'Orthopedics' },
+    { label: '⚕️ General Medicine', message: 'General Medicine' },
   ],
 };
 
@@ -43,18 +41,15 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Detect if we're in appointment booking flow
   const isInAppointmentFlow = messages.some(m => 
     m.content.toLowerCase().includes('book an appointment') ||
     m.content.toLowerCase().includes('which department')
   );
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Send message to API
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
 
@@ -120,7 +115,6 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
     sendMessage(inputValue);
   };
 
-  // Voice recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -167,337 +161,464 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
     }
   };
 
-  // Styles object for inline styles (bypasses Tailwind issues)
-  const styles = {
-    container: {
+  return (
+    <div style={{
       display: 'flex',
-      flexDirection: 'column' as const,
+      flexDirection: 'column',
       height: '100vh',
       width: '100%',
-      backgroundColor: '#121212',
-    },
-    centerWrapper: {
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100%',
-      width: '100%',
-      padding: '0',
-    },
-    chatBox: {
-      display: 'flex',
-      flexDirection: 'column' as const,
-      width: '100%',
-      maxWidth: '900px',
-      height: '100%',
-      backgroundColor: '#1a1a1a',
-      borderRadius: '0',
-      overflow: 'hidden',
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: '16px',
-      borderBottom: '1px solid #2a2a2a',
-    },
-    title: {
-      fontSize: '24px',
-      fontWeight: 700,
-      color: 'white',
-      margin: 0,
-    },
-    menuButton: {
-      padding: '8px',
-      background: 'transparent',
-      border: 'none',
-      cursor: 'pointer',
-      color: '#9ca3af',
-    },
-    menuDropdown: {
-      position: 'absolute' as const,
-      right: 0,
-      top: '48px',
-      width: '180px',
-      backgroundColor: '#212121',
-      borderRadius: '12px',
-      overflow: 'hidden',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-      zIndex: 50,
-    },
-    messagesArea: {
-      flex: 1,
-      overflowY: 'auto' as const,
-      padding: '16px',
-    },
-    welcomeContainer: {
-      display: 'flex',
-      flexDirection: 'column' as const,
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100%',
-      textAlign: 'center' as const,
-    },
-    welcomeIcon: {
-      width: '80px',
-      height: '80px',
-      background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: '24px',
-    },
-    welcomeTitle: {
-      fontSize: '28px',
-      fontWeight: 600,
-      color: 'white',
-      margin: '0 0 8px 0',
-    },
-    welcomeText: {
-      fontSize: '16px',
-      color: '#9ca3af',
-      margin: 0,
-    },
-    quickActions: {
-      display: 'flex',
-      gap: '6px',
-      padding: '10px 12px',
-      overflowX: 'auto' as const,
-      borderTop: '1px solid #2a2a2a',
-      flexWrap: 'wrap' as const,
-      justifyContent: 'center',
-    },
-    quickActionButton: {
-      padding: '8px 14px',
-      backgroundColor: '#212121',
-      border: '1px solid #3a3a3a',
-      borderRadius: '20px',
-      color: 'white',
-      fontSize: '12px',
-      fontWeight: 500,
-      cursor: 'pointer',
-      whiteSpace: 'nowrap' as const,
-      transition: 'all 0.2s',
-      flex: '0 1 auto',
-      minWidth: 'fit-content',
-    },
-    inputArea: {
-      padding: '12px 16px 24px',
-    },
-    inputContainer: {
-      display: 'flex',
-      alignItems: 'center',
-      backgroundColor: '#212121',
-      borderRadius: '28px',
-      padding: '8px 16px',
-    },
-    micButton: {
-      padding: '12px',
-      background: 'transparent',
-      border: 'none',
-      cursor: 'pointer',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    textInput: {
-      flex: 1,
-      background: 'transparent',
-      border: 'none',
-      outline: 'none',
-      color: 'white',
-      fontSize: '16px',
-      padding: '12px',
-    },
-    sendButton: {
-      padding: '12px',
-      background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-      border: 'none',
-      borderRadius: '50%',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  };
+      background: 'linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%)',
+      fontFamily: '"Segoe UI", "Helvetica Neue", sans-serif',
+    }}>
+      <style>{`
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0,0,0,0.1) transparent;
+        }
+        *::-webkit-scrollbar {
+          width: 6px;
+        }
+        *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        *::-webkit-scrollbar-thumb {
+          background: rgba(0,0,0,0.1);
+          border-radius: 3px;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+          background: rgba(0,0,0,0.2);
+        }
+        input::placeholder {
+          color: #a0aec0;
+          font-weight: 400;
+        }
+      `}</style>
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.centerWrapper}>
-        <div style={styles.chatBox}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        flex: 1,
+        width: '100%',
+        padding: '0',
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          maxWidth: '900px',
+          height: '100%',
+          backgroundColor: 'white',
+          borderRadius: '0',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
+        }}>
           {/* Header */}
-          <header style={styles.header}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button
-                onClick={() => window.location.href = '/'}
+          <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 24px',
+            borderBottom: '2px solid #e0f2fe',
+            background: 'linear-gradient(90deg, #ffffff 0%, #f0f9ff 100%)',
+            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              {/* Hospital Logo */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 100 }}
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)',
+                }}
+              >
+                <img src="/sims-logo.jpg" alt="" />
+              </motion.div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <h1 style={{
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  color: '#0c2d4a',
+                  margin: 0,
+                  letterSpacing: '-0.5px',
+                }}>SIMS Healthcare</h1>
+                <p style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#0ea5e9',
+                  margin: 0,
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                }}>AI Assistant</p>
+              </div>
+            </div>
+            
+            <div style={{ position: 'relative' }}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowMenu(!showMenu)}
                 style={{
                   padding: '8px',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#9ca3af',
+                  color: '#6b7280',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '8px',
-                  transition: 'color 0.2s',
+                  transition: 'all 0.2s',
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-                onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
-              >
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <h1 style={styles.title}>SIMS AI</h1>
-            </div>
-            
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                style={styles.menuButton}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.color = '#1f2937';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }}
               >
                 <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="5" r="2"/>
                   <circle cx="12" cy="12" r="2"/>
                   <circle cx="12" cy="19" r="2"/>
                 </svg>
-              </button>
+              </motion.button>
 
               <AnimatePresence>
                 {showMenu && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    initial={{ opacity: 0, scale: 0.92, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    style={styles.menuDropdown}
+                    exit={{ opacity: 0, scale: 0.92, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: '48px',
+                      width: '200px',
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                      zIndex: 50,
+                      border: '1px solid #e5e7eb',
+                    }}
                   >
                     <div style={{ padding: '8px 0' }}>
-                      <p style={{ padding: '8px 16px', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase' }}>Language</p>
-                      <button
+                      <p style={{ padding: '8px 16px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Language</p>
+                      <motion.button
+                        whileHover={{ background: '#f3f4f6' }}
                         onClick={() => { setLanguage('en-IN'); setShowMenu(false); }}
                         style={{
                           width: '100%',
                           padding: '12px 16px',
                           textAlign: 'left',
-                          background: language === 'en-IN' ? '#374151' : 'transparent',
+                          background: language === 'en-IN' ? '#eff6ff' : 'transparent',
                           border: 'none',
-                          color: 'white',
+                          color: language === 'en-IN' ? '#1f2937' : '#4b5563',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
+                          fontSize: '14px',
+                          fontWeight: language === 'en-IN' ? 600 : 500,
+                          transition: 'all 0.15s',
                         }}
                       >
                         English
-                        {language === 'en-IN' && <span style={{ color: '#60a5fa' }}>✓</span>}
-                      </button>
-                      <button
+                        {language === 'en-IN' && <span style={{ color: '#3b82f6', fontWeight: 700 }}>✓</span>}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ background: '#f3f4f6' }}
                         onClick={() => { setLanguage('ta-IN'); setShowMenu(false); }}
                         style={{
                           width: '100%',
                           padding: '12px 16px',
                           textAlign: 'left',
-                          background: language === 'ta-IN' ? '#374151' : 'transparent',
+                          background: language === 'ta-IN' ? '#eff6ff' : 'transparent',
                           border: 'none',
-                          color: 'white',
+                          color: language === 'ta-IN' ? '#1f2937' : '#4b5563',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
+                          fontSize: '14px',
+                          fontWeight: language === 'ta-IN' ? 600 : 500,
+                          transition: 'all 0.15s',
                         }}
                       >
                         தமிழ்
-                        {language === 'ta-IN' && <span style={{ color: '#60a5fa' }}>✓</span>}
-                      </button>
+                        {language === 'ta-IN' && <span style={{ color: '#3b82f6', fontWeight: 700 }}>✓</span>}
+                      </motion.button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-          </header>
+          </motion.header>
 
           {/* Messages Area */}
-          <div style={styles.messagesArea}>
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
             {messages.length === 0 && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={styles.welcomeContainer}
+                transition={{ delay: 0.2 }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                }}
               >
-                <div style={styles.welcomeIcon}>
-                  <svg width="40" height="40" fill="none" stroke="white" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  style={{
+                    width: '90px',
+                    height: '90px',
+                    background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '28px',
+                    boxShadow: '0 15px 40px rgba(14, 165, 233, 0.25)',
+                    position: 'relative',
+                  }}
+                >
+                  <svg width="50" height="50" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 7.5A2.5 2.5 0 016 5h12a2.5 2.5 0 012.5 2.5v9A2.5 2.5 0 0118 19H6a2.5 2.5 0 01-2.5-2.5v-9z" />
                   </svg>
-                </div>
-                <h2 style={styles.welcomeTitle}>
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    style={{
+                      position: 'absolute',
+                      inset: '-4px',
+                      border: '2px solid rgba(14, 165, 233, 0.3)',
+                      borderRadius: '20px',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </motion.div>
+                <motion.h2 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  style={{
+                    fontSize: '32px',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #0c2d4a 0%, #0284c7 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    margin: '0 0 12px 0',
+                    letterSpacing: '-0.8px',
+                  }}
+                >
                   {language === 'ta-IN' ? 'வணக்கம்!' : 'Welcome!'}
-                </h2>
-                <p style={styles.welcomeText}>
+                </motion.h2>
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  style={{
+                    fontSize: '17px',
+                    color: '#4b5563',
+                    margin: 0,
+                    fontWeight: 600,
+                    lineHeight: '1.6',
+                  }}
+                >
                   {language === 'ta-IN' 
-                    ? 'நான் உங்களுக்கு எப்படி உதவ முடியும்?'
-                    : 'How can I help you today?'}
-                </p>
+                    ? 'நிச்சய ஆரோக்கியத்துக்கு உங்கள் மருத்துவ உதவி'
+                    : 'Your AI-powered healthcare companion'}
+                </motion.p>
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.55 }}
+                  style={{
+                    fontSize: '14px',
+                    color: '#8b94a1',
+                    margin: '8px 0 0 0',
+                    fontWeight: 500,
+                  }}
+                >
+                  {language === 'ta-IN' 
+                    ? 'நियமன பதிவு, நோயாளி தகவல், மற்றும் மேலும் பல'
+                    : 'Appointments, patient info, visiting hours & more'}
+                </motion.p>
               </motion.div>
             )}
 
             <AnimatePresence>
-              {messages.map((message) => (
-                <MessageBubble
+              {messages.map((message, index) => (
+                <motion.div
                   key={message.id}
-                  role={message.role}
-                  content={message.content}
-                />
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <MessageBubble
+                    role={message.role}
+                    content={message.content}
+                  />
+                </motion.div>
               ))}
             </AnimatePresence>
 
             {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-              <MessageBubble role="assistant" content="" isLoading />
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <MessageBubble role="assistant" content="" isLoading />
+              </motion.div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
 
           {/* Quick Actions */}
-          <div style={styles.quickActions}>
-            {(isInAppointmentFlow ? APPOINTMENT_ACTIONS.departments : QUICK_ACTIONS).map((action) => (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            style={{
+              display: 'flex',
+              gap: '8px',
+              padding: '12px 24px',
+              overflowX: 'auto',
+              borderTop: '2px solid #e0f2fe',
+              background: 'linear-gradient(180deg, #f8fafb 0%, #f0f9ff 100%)',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+            }}
+          >
+            {(isInAppointmentFlow ? APPOINTMENT_ACTIONS.departments : QUICK_ACTIONS).map((action, index) => (
               <motion.button
                 key={action.label}
-                whileHover={{ scale: 1.02, borderColor: '#3B82F6' }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.05 }}
+                whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => sendMessage(action.message)}
                 disabled={isLoading}
                 style={{
-                  ...styles.quickActionButton,
+                  padding: '10px 16px',
+                  backgroundColor: 'white',
+                  border: '1.5px solid #cffafe',
+                  borderRadius: '24px',
+                  color: '#0c2d4a',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
                   opacity: isLoading ? 0.5 : 1,
+                  boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.borderColor = '#0ea5e9';
+                    e.currentTarget.style.color = '#0284c7';
+                    e.currentTarget.style.backgroundColor = '#f0f9ff';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(14, 165, 233, 0.2)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#cffafe';
+                  e.currentTarget.style.color = '#0c2d4a';
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.08)';
                 }}
               >
                 {action.label}
               </motion.button>
             ))}
-          </div>
+          </motion.div>
 
           {/* Input Area */}
-          <div style={styles.inputArea}>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            style={{
+              padding: '16px 24px 24px',
+              background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)',
+            }}
+          >
             <form onSubmit={handleSubmit}>
-              <div style={styles.inputContainer}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'white',
+                borderRadius: '28px',
+                padding: '10px 16px',
+                border: '1.5px solid #cffafe',
+                transition: 'all 0.2s',
+                boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#0ea5e9';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14, 165, 233, 0.15)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#cffafe';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.08)';
+              }}
+              >
                 {/* Mic Button */}
-                <button
+                <motion.button
                   type="button"
                   onMouseDown={startRecording}
                   onMouseUp={stopRecording}
                   onTouchStart={startRecording}
                   onTouchEnd={stopRecording}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   style={{
-                    ...styles.micButton,
-                    color: isRecording ? '#ef4444' : '#9ca3af',
+                    padding: '10px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isRecording ? '#ef4444' : '#7c8ea3',
+                    transition: 'color 0.2s',
                   }}
+                  onMouseEnter={(e) => !isRecording && (e.currentTarget.style.color = '#0ea5e9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#ef4444' : '#7c8ea3')}
                 >
-                  <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                  <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                     <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                   </svg>
-                </button>
+                </motion.button>
 
                 {/* Text Input */}
                 <input
@@ -506,7 +627,17 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={language === 'ta-IN' ? 'உங்கள் செய்தியை தட்டச்சு செய்யவும்...' : 'Type your message...'}
-                  style={styles.textInput}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: '#0c2d4a',
+                    fontSize: '15px',
+                    padding: '10px 12px',
+                    fontFamily: 'inherit',
+                    fontWeight: 500,
+                  }}
                   disabled={isLoading}
                 />
 
@@ -514,20 +645,28 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                 <motion.button
                   type="submit"
                   disabled={!inputValue.trim() || isLoading}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={!(!inputValue.trim() || isLoading) ? { scale: 1.1 } : {}}
+                  whileTap={!(!inputValue.trim() || isLoading) ? { scale: 0.95 } : {}}
                   style={{
-                    ...styles.sendButton,
-                    opacity: (!inputValue.trim() || isLoading) ? 0.3 : 1,
+                    padding: '10px',
+                    background: !inputValue.trim() || isLoading ? '#e5e7eb' : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    cursor: (!inputValue.trim() || isLoading) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s',
+                    boxShadow: (!inputValue.trim() || isLoading) ? 'none' : '0 4px 12px rgba(14, 165, 233, 0.4)',
                   }}
                 >
-                  <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+                  <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
                   </svg>
                 </motion.button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
