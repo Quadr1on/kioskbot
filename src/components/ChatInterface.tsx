@@ -167,13 +167,14 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       flexDirection: 'column',
       height: '100vh',
       width: '100%',
-      background: 'linear-gradient(135deg, #f8f9fa 0%, #f3f4f6 100%)',
+      backgroundColor: '#121212',
       fontFamily: '"Segoe UI", "Helvetica Neue", sans-serif',
+      overflow: 'hidden',
     }}>
       <style>{`
         * {
           scrollbar-width: thin;
-          scrollbar-color: rgba(0,0,0,0.1) transparent;
+          scrollbar-color: #3a3a3a transparent;
         }
         *::-webkit-scrollbar {
           width: 6px;
@@ -182,14 +183,14 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
           background: transparent;
         }
         *::-webkit-scrollbar-thumb {
-          background: rgba(0,0,0,0.1);
+          background: #3a3a3a;
           border-radius: 3px;
         }
         *::-webkit-scrollbar-thumb:hover {
-          background: rgba(0,0,0,0.2);
+          background: #4a4a4a;
         }
         input::placeholder {
-          color: #a0aec0;
+          color: #6b7280;
           font-weight: 400;
         }
       `}</style>
@@ -201,6 +202,8 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
         flex: 1,
         width: '100%',
         padding: '0',
+        minHeight: 0,
+        overflow: 'hidden',
       }}>
         <div style={{
           display: 'flex',
@@ -208,10 +211,9 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
           width: '100%',
           maxWidth: '900px',
           height: '100%',
-          backgroundColor: 'white',
+          backgroundColor: '#1a1a1a',
           borderRadius: '0',
           overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
         }}>
           {/* Header */}
           <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{
@@ -219,9 +221,8 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '16px 24px',
-            borderBottom: '2px solid #e0f2fe',
-            background: 'linear-gradient(90deg, #ffffff 0%, #f0f9ff 100%)',
-            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
+            borderBottom: '1px solid #2a2a2a',
+            backgroundColor: '#1a1a1a',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               {/* Hospital Logo */}
@@ -232,12 +233,12 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                 style={{
                   width: '44px',
                   height: '44px',
-                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
                   borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
                 }}
               >
                 <img src="/sims-logo.jpg" alt="" />
@@ -247,14 +248,14 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                 <h1 style={{
                   fontSize: '18px',
                   fontWeight: 800,
-                  color: '#0c2d4a',
+                  color: 'white',
                   margin: 0,
                   letterSpacing: '-0.5px',
                 }}>SIMS Healthcare</h1>
                 <p style={{
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: '#0ea5e9',
+                  color: '#60a5fa',
                   margin: 0,
                   letterSpacing: '0.5px',
                   textTransform: 'uppercase',
@@ -272,7 +273,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#6b7280',
+                  color: '#9ca3af',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -280,12 +281,12 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6';
-                  e.currentTarget.style.color = '#1f2937';
+                  e.currentTarget.style.background = '#2a2a2a';
+                  e.currentTarget.style.color = 'white';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.color = '#9ca3af';
                 }}
               >
                 <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
@@ -307,26 +308,26 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                       right: 0,
                       top: '48px',
                       width: '200px',
-                      backgroundColor: 'white',
+                      backgroundColor: '#212121',
                       borderRadius: '12px',
                       overflow: 'hidden',
-                      boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                      boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
                       zIndex: 50,
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid #2a2a2a',
                     }}
                   >
                     <div style={{ padding: '8px 0' }}>
-                      <p style={{ padding: '8px 16px', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Language</p>
+                      <p style={{ padding: '8px 16px', fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Language</p>
                       <motion.button
-                        whileHover={{ background: '#f3f4f6' }}
+                        whileHover={{ background: '#2a2a2a' }}
                         onClick={() => { setLanguage('en-IN'); setShowMenu(false); }}
                         style={{
                           width: '100%',
                           padding: '12px 16px',
                           textAlign: 'left',
-                          background: language === 'en-IN' ? '#eff6ff' : 'transparent',
+                          background: language === 'en-IN' ? '#374151' : 'transparent',
                           border: 'none',
-                          color: language === 'en-IN' ? '#1f2937' : '#4b5563',
+                          color: 'white',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -336,18 +337,18 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                         }}
                       >
                         English
-                        {language === 'en-IN' && <span style={{ color: '#3b82f6', fontWeight: 700 }}>✓</span>}
+                        {language === 'en-IN' && <span style={{ color: '#60a5fa', fontWeight: 700 }}>✓</span>}
                       </motion.button>
                       <motion.button
-                        whileHover={{ background: '#f3f4f6' }}
+                        whileHover={{ background: '#2a2a2a' }}
                         onClick={() => { setLanguage('ta-IN'); setShowMenu(false); }}
                         style={{
                           width: '100%',
                           padding: '12px 16px',
                           textAlign: 'left',
-                          background: language === 'ta-IN' ? '#eff6ff' : 'transparent',
+                          background: language === 'ta-IN' ? '#374151' : 'transparent',
                           border: 'none',
-                          color: language === 'ta-IN' ? '#1f2937' : '#4b5563',
+                          color: 'white',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -357,7 +358,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                         }}
                       >
                         தமிழ்
-                        {language === 'ta-IN' && <span style={{ color: '#3b82f6', fontWeight: 700 }}>✓</span>}
+                        {language === 'ta-IN' && <span style={{ color: '#60a5fa', fontWeight: 700 }}>✓</span>}
                       </motion.button>
                     </div>
                   </motion.div>
@@ -373,6 +374,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
+            minHeight: 0,
           }}>
             {messages.length === 0 && (
               <motion.div 
@@ -395,13 +397,13 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   style={{
                     width: '90px',
                     height: '90px',
-                    background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                    background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
                     borderRadius: '20px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: '28px',
-                    boxShadow: '0 15px 40px rgba(14, 165, 233, 0.25)',
+                    boxShadow: '0 15px 40px rgba(59, 130, 246, 0.25)',
                     position: 'relative',
                   }}
                 >
@@ -415,7 +417,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                     style={{
                       position: 'absolute',
                       inset: '-4px',
-                      border: '2px solid rgba(14, 165, 233, 0.3)',
+                      border: '2px solid rgba(59, 130, 246, 0.3)',
                       borderRadius: '20px',
                       pointerEvents: 'none',
                     }}
@@ -428,7 +430,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   style={{
                     fontSize: '32px',
                     fontWeight: 800,
-                    background: 'linear-gradient(135deg, #0c2d4a 0%, #0284c7 100%)',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #60a5fa 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
@@ -444,7 +446,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   transition={{ delay: 0.5 }}
                   style={{
                     fontSize: '17px',
-                    color: '#4b5563',
+                    color: '#9ca3af',
                     margin: 0,
                     fontWeight: 600,
                     lineHeight: '1.6',
@@ -460,7 +462,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   transition={{ delay: 0.55 }}
                   style={{
                     fontSize: '14px',
-                    color: '#8b94a1',
+                    color: '#6b7280',
                     margin: '8px 0 0 0',
                     fontWeight: 500,
                   }}
@@ -510,8 +512,8 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
               gap: '8px',
               padding: '12px 24px',
               overflowX: 'auto',
-              borderTop: '2px solid #e0f2fe',
-              background: 'linear-gradient(180deg, #f8fafb 0%, #f0f9ff 100%)',
+              borderTop: '1px solid #2a2a2a',
+              backgroundColor: '#1a1a1a',
               flexWrap: 'wrap',
               justifyContent: 'center',
             }}
@@ -528,31 +530,28 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                 disabled={isLoading}
                 style={{
                   padding: '10px 16px',
-                  backgroundColor: 'white',
-                  border: '1.5px solid #cffafe',
+                  backgroundColor: '#212121',
+                  border: '1px solid #3a3a3a',
                   borderRadius: '24px',
-                  color: '#0c2d4a',
+                  color: 'white',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.2s',
                   opacity: isLoading ? 0.5 : 1,
-                  boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
                 }}
                 onMouseEnter={(e) => {
                   if (!isLoading) {
-                    e.currentTarget.style.borderColor = '#0ea5e9';
-                    e.currentTarget.style.color = '#0284c7';
-                    e.currentTarget.style.backgroundColor = '#f0f9ff';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(14, 165, 233, 0.2)';
+                    e.currentTarget.style.borderColor = '#3B82F6';
+                    e.currentTarget.style.backgroundColor = '#2a2a2a';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#cffafe';
-                  e.currentTarget.style.color = '#0c2d4a';
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.08)';
+                  e.currentTarget.style.borderColor = '#3a3a3a';
+                  e.currentTarget.style.backgroundColor = '#212121';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 {action.label}
@@ -567,27 +566,26 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
             transition={{ delay: 0.4 }}
             style={{
               padding: '16px 24px 24px',
-              background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)',
+              backgroundColor: '#1a1a1a',
             }}
           >
             <form onSubmit={handleSubmit}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: 'white',
+                backgroundColor: '#212121',
                 borderRadius: '28px',
                 padding: '10px 16px',
-                border: '1.5px solid #cffafe',
+                border: '1px solid #3a3a3a',
                 transition: 'all 0.2s',
-                boxShadow: '0 2px 8px rgba(14, 165, 233, 0.08)',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#0ea5e9';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14, 165, 233, 0.15)';
+                e.currentTarget.style.borderColor = '#3B82F6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.15)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#cffafe';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.08)';
+                e.currentTarget.style.borderColor = '#3a3a3a';
+                e.currentTarget.style.boxShadow = 'none';
               }}
               >
                 {/* Mic Button */}
@@ -608,11 +606,11 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: isRecording ? '#ef4444' : '#7c8ea3',
+                    color: isRecording ? '#ef4444' : '#9ca3af',
                     transition: 'color 0.2s',
                   }}
-                  onMouseEnter={(e) => !isRecording && (e.currentTarget.style.color = '#0ea5e9')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#ef4444' : '#7c8ea3')}
+                  onMouseEnter={(e) => !isRecording && (e.currentTarget.style.color = '#3B82F6')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#ef4444' : '#9ca3af')}
                 >
                   <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
@@ -632,7 +630,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
-                    color: '#0c2d4a',
+                    color: 'white',
                     fontSize: '15px',
                     padding: '10px 12px',
                     fontFamily: 'inherit',
@@ -649,7 +647,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                   whileTap={!(!inputValue.trim() || isLoading) ? { scale: 0.95 } : {}}
                   style={{
                     padding: '10px',
-                    background: !inputValue.trim() || isLoading ? '#e5e7eb' : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                    background: !inputValue.trim() || isLoading ? '#3a3a3a' : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
                     border: 'none',
                     borderRadius: '50%',
                     cursor: (!inputValue.trim() || isLoading) ? 'not-allowed' : 'pointer',
@@ -657,7 +655,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     transition: 'all 0.2s',
-                    boxShadow: (!inputValue.trim() || isLoading) ? 'none' : '0 4px 12px rgba(14, 165, 233, 0.4)',
+                    boxShadow: (!inputValue.trim() || isLoading) ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.4)',
                   }}
                 >
                   <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="2">

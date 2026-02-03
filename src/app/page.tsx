@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '@/components/ChatInterface';
 import VoiceMode from '@/components/VoiceMode';
 import Image from 'next/image';
+import { preloadGreetings } from '@/lib/greetingCache';
 
 type Mode = 'select' | 'chat' | 'voice';
 
@@ -14,13 +15,19 @@ export default function Home() {
 
   // Hospital-themed background images URLs (using Unsplash for high-quality hospital images)
   const backgroundImages = [
-    '/image1.jpg', // Modern hospital exterior
+    '/image.jpeg', // Modern hospital exterior
     '/image2.jpg', // Hospital corridor
-    '/image3.jpg', // Medical equipment
-    '/image4.jpg', // Hospital room
+    '/image3.jpeg', // Medical equipment
+    '/image4.jpeg', // Hospital room
     '/image5.webp', // Medical team
+    '/image7.jpeg', // Health on wheels
     '/image6.webp', // Healthcare technology
   ];
+
+  // Preload voice mode greeting audio when home page mounts
+  useEffect(() => {
+    preloadGreetings();
+  }, []);
 
   // Auto-slide background images every 5 seconds
   useEffect(() => {
@@ -39,27 +46,24 @@ export default function Home() {
     return <VoiceMode onSwitchToChat={() => setMode('chat')} />;
   }
 
-  // Inline styles matching ChatInterface design
+  // Inline styles for split-screen layout
   const styles = {
     container: {
-      position: 'relative' as const,
       display: 'flex',
-      flexDirection: 'column' as const,
-      alignItems: 'center',
-      justifyContent: 'center',
       minHeight: '100vh',
       overflow: 'hidden',
-      padding: '48px 24px',
+      '@media (max-width: 768px)': {
+        flexDirection: 'column',
+      },
     },
-    backgroundContainer: {
-      position: 'fixed' as const,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      zIndex: 0,
+    // Left section - Slideshow
+    leftSection: {
+      position: 'relative' as const,
+      width: '50%',
+      height: '100vh',
+      overflow: 'hidden',
     },
-    backgroundImage: {
+    slideshowImage: {
       position: 'absolute' as const,
       top: 0,
       left: 0,
@@ -67,37 +71,71 @@ export default function Home() {
       height: '100%',
       objectFit: 'cover' as const,
     },
-    overlay: {
+    slideshowOverlay: {
       position: 'absolute' as const,
       top: 0,
       left: 0,
       width: '100%',
       height: '100%',
-      backgroundColor: 'rgba(0, 0, 0, 0.75)',
-      backdropFilter: 'blur(8px)',
+      background: 'linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5))',
       zIndex: 1,
     },
-    contentWrapper: {
+    slideIndicators: {
+      position: 'absolute' as const,
+      bottom: '40px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      display: 'flex',
+      gap: '12px',
+      zIndex: 3,
+    },
+    indicator: {
+      width: '10px',
+      height: '10px',
+      borderRadius: '50%',
+      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      border: '2px solid rgba(255, 255, 255, 0.6)',
+    },
+    activeIndicator: {
+      width: '32px',
+      borderRadius: '5px',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      border: '2px solid white',
+    },
+    // Right section - Content
+    rightSection: {
       position: 'relative' as const,
-      zIndex: 2,
+      width: '50%',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '48px 40px',
+      background: '#121212',
+      overflowY: 'auto' as const,
+    },
+    contentWrapper: {
       width: '100%',
-      maxWidth: '1200px',
+      maxWidth: '500px',
       display: 'flex',
       flexDirection: 'column' as const,
       alignItems: 'center',
     },
     logoContainer: {
       position: 'relative' as const,
-      width: '140px',
-      height: '140px',
+      width: '120px',
+      height: '120px',
       marginBottom: '24px',
       background: 'rgba(255, 255, 255, 0.95)',
-      borderRadius: '32px',
+      borderRadius: '28px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px',
-      boxShadow: '0 20px 60px rgba(255, 255, 255, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+      padding: '16px',
+      boxShadow: '0 20px 60px rgba(255, 255, 255, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
       border: '2px solid rgba(255, 255, 255, 0.2)',
     },
     logo: {
@@ -106,293 +144,310 @@ export default function Home() {
       objectFit: 'contain' as const,
     },
     title: {
-      fontSize: '42px',
+      fontSize: '36px',
       fontWeight: 700,
       color: 'white',
-      margin: '0 0 12px 0',
+      margin: '0 0 10px 0',
       textAlign: 'center' as const,
       fontFamily: 'var(--font-roboto-slab), serif',
       textShadow: '0 2px 20px rgba(0, 0, 0, 0.5)',
       letterSpacing: '-0.5px',
     },
     subtitle: {
-      fontSize: '20px',
-      color: '#e5e7eb',
-      margin: '0 0 56px 0',
+      fontSize: '18px',
+      color: '#9ca3af',
+      margin: '0 0 40px 0',
       textAlign: 'center' as const,
-      textShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
     },
     cardsContainer: {
       display: 'flex',
-      gap: '28px',
-      marginBottom: '56px',
-      flexWrap: 'wrap' as const,
-      justifyContent: 'center',
+      flexDirection: 'row' as const,
+      gap: '20px',
+      marginBottom: '40px',
+      width: '100%',
     },
     card: {
-      width: '300px',
-      padding: '36px',
-      backgroundColor: 'rgba(26, 26, 26, 0.85)',
+      flex: 1,
+      padding: '24px',
+      backgroundColor: '#1a1a1a',
       backdropFilter: 'blur(20px)',
-      borderRadius: '28px',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '24px',
+      border: '1px solid #2a2a2a',
       cursor: 'pointer',
-      textAlign: 'left' as const,
-      transition: 'all 0.3s ease',
+      textAlign: 'center' as const,
+      transition: 'all 0.1s ease',
       boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'center',
+      gap: '16px',
     },
     cardIcon: {
-      width: '72px',
-      height: '72px',
-      borderRadius: '20px',
+      width: '60px',
+      height: '60px',
+      borderRadius: '16px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: '24px',
+      flexShrink: 0,
+    },
+    cardContent: {
+      flex: 1,
     },
     cardTitle: {
-      fontSize: '24px',
+      fontSize: '20px',
       fontWeight: 600,
       color: 'white',
-      margin: '0 0 10px 0',
+      margin: '0 0 6px 0',
     },
     cardDescription: {
-      fontSize: '16px',
-      color: '#d1d5db',
+      fontSize: '13px',
+      color: '#9ca3af',
       margin: 0,
-      lineHeight: 1.6,
+      lineHeight: 1.5,
     },
     quickActionsLabel: {
-      fontSize: '15px',
-      color: '#d1d5db',
-      marginBottom: '20px',
+      fontSize: '14px',
+      color: '#9ca3af',
+      marginBottom: '16px',
       fontWeight: 500,
-      textShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '1px',
     },
     quickActionsContainer: {
       display: 'flex',
       flexWrap: 'wrap' as const,
-      gap: '14px',
+      gap: '12px',
       justifyContent: 'center',
-      maxWidth: '700px',
+      width: '100%',
     },
     quickActionButton: {
-      padding: '16px 28px',
-      backgroundColor: 'rgba(26, 26, 26, 0.85)',
+      padding: '14px 22px',
+      backgroundColor: '#212121',
       backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-      borderRadius: '18px',
-      color: '#e5e7eb',
-      fontSize: '15px',
+      border: '1px solid #2a2a2a',
+      borderRadius: '14px',
+      color: '#9ca3af',
+      fontSize: '14px',
       fontWeight: 500,
       cursor: 'pointer',
       transition: 'all 0.2s ease',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
     },
     footer: {
-      marginTop: '56px',
+      marginTop: '40px',
       textAlign: 'center' as const,
-      color: '#d1d5db',
-      fontSize: '15px',
-      textShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
-    },
-    slideIndicators: {
-      position: 'absolute' as const,
-      bottom: '30px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      display: 'flex',
-      gap: '10px',
-      zIndex: 3,
-    },
-    indicator: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      backgroundColor: 'rgba(255, 255, 255, 0.3)',
-      cursor: 'pointer',
-      transition: 'all 0.3s ease',
-    },
-    activeIndicator: {
-      width: '24px',
-      borderRadius: '4px',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      color: '#6b7280',
+      fontSize: '14px',
     },
   };
 
   const quickActions = ['Find Patient', 'Book Appointment', 'Visiting Hours', 'Emergency'];
 
+  // Mobile responsive CSS
+  const mobileStyles = `
+    @media (max-width: 768px) {
+      .home-container {
+        flex-direction: column !important;
+      }
+      .slideshow-section {
+        width: 100% !important;
+        height: 35vh !important;
+      }
+      .content-section {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 65vh !important;
+        padding: 24px 20px !important;
+      }
+      .cards-container {
+        flex-direction: column !important;
+      }
+      .mode-card {
+        width: 100% !important;
+        flex: none !important;
+      }
+    }
+  `;
+
   return (
-    <div style={styles.container}>
-      {/* Sliding Background Images */}
-      <div style={styles.backgroundContainer}>
+    <>
+      <style>{mobileStyles}</style>
+      <div style={styles.container} className="home-container">
+        {/* Left Section - Slideshow */}
+        <div style={styles.leftSection} className="slideshow-section">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentBgIndex}
-            initial={{ opacity: 0, scale: 1.1 }}
+            initial={{ opacity: 0, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 1.5, ease: 'easeInOut' }}
-            style={styles.backgroundImage}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            style={styles.slideshowImage}
           >
             <img
               src={backgroundImages[currentBgIndex]}
-              alt="Hospital background"
-              style={styles.backgroundImage}
+              alt="Hospital"
+              style={styles.slideshowImage}
             />
           </motion.div>
         </AnimatePresence>
-        <div style={styles.overlay} />
-      </div>
-
-      {/* Content */}
-      <div style={styles.contentWrapper}>
-        {/* SIMS Logo */}
-        <motion.div 
-          style={styles.logoContainer}
-          initial={{ scale: 0.8, opacity: 0, y: -20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        >
-          <img 
-            src="/sims-logo.jpg" 
-            alt="SIMS Hospital Logo" 
-            style={styles.logo}
-          />
-        </motion.div>
-
-        {/* Title */}
-        <motion.h1 
-          style={styles.title}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-        >
-          Welcome to SIMS Hospital
-        </motion.h1>
-        <motion.p 
-          style={styles.subtitle}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          How would you like to interact with me?
-        </motion.p>
-
-        {/* Mode Selection Cards */}
-        <div style={styles.cardsContainer}>
-          {/* Chat Mode Card */}
-          <motion.button
-            onClick={() => setMode('chat')}
-            style={styles.card}
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            whileHover={{ 
-              scale: 1.03, 
-              borderColor: 'rgba(59, 130, 246, 0.5)',
-              boxShadow: '0 20px 60px rgba(59, 130, 246, 0.3)',
-              backgroundColor: 'rgba(35, 35, 35, 0.9)'
-            }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
-              <svg width="36" height="36" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <h2 style={styles.cardTitle}>Chat Mode</h2>
-            <p style={styles.cardDescription}>Type your questions using the on-screen keyboard</p>
-          </motion.button>
-
-          {/* Voice Mode Card */}
-          <motion.button
-            onClick={() => setMode('voice')}
-            style={styles.card}
-            initial={{ y: 40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            whileHover={{ 
-              scale: 1.03, 
-              borderColor: 'rgba(139, 92, 246, 0.5)',
-              boxShadow: '0 20px 60px rgba(139, 92, 246, 0.3)',
-              backgroundColor: 'rgba(35, 35, 35, 0.9)'
-            }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(139, 92, 246, 0.2)' }}>
-              <svg width="36" height="36" fill="#8B5CF6" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-              </svg>
-            </div>
-            <h2 style={styles.cardTitle}>Voice Mode</h2>
-            <p style={styles.cardDescription}>Speak naturally in English or Tamil</p>
-          </motion.button>
-        </div>
-
-        {/* Quick Actions */}
-        <motion.p 
-          style={styles.quickActionsLabel}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-        >
-          Quick Actions
-        </motion.p>
-        <motion.div 
-          style={styles.quickActionsContainer}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          {quickActions.map((action, index) => (
-            <motion.button
-              key={action}
-              onClick={() => setMode('chat')}
-              style={styles.quickActionButton}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.6 + index * 0.1 }}
-              whileHover={{ 
-                borderColor: 'rgba(59, 130, 246, 0.5)',
-                color: 'white',
-                backgroundColor: 'rgba(35, 35, 35, 0.95)',
-                boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)'
+        <div style={styles.slideshowOverlay} />
+        
+        {/* Slide Indicators */}
+        <div style={styles.slideIndicators}>
+          {backgroundImages.map((_, index) => (
+            <motion.div
+              key={index}
+              style={{
+                ...styles.indicator,
+                ...(index === currentBgIndex ? styles.activeIndicator : {}),
               }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {action}
-            </motion.button>
+              onClick={() => setCurrentBgIndex(index)}
+              whileHover={{ scale: 1.2 }}
+              whileTap={{ scale: 0.9 }}
+            />
           ))}
-        </motion.div>
-
-        {/* Footer */}
-        <motion.footer 
-          style={styles.footer}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-        >
-          Need help? Speak to our reception or call 1066
-        </motion.footer>
+        </div>
       </div>
 
-      {/* Slide Indicators */}
-      <div style={styles.slideIndicators}>
-        {backgroundImages.map((_, index) => (
-          <motion.div
-            key={index}
-            style={{
-              ...styles.indicator,
-              ...(index === currentBgIndex ? styles.activeIndicator : {}),
-            }}
-            onClick={() => setCurrentBgIndex(index)}
-            whileHover={{ scale: 1.2 }}
-            whileTap={{ scale: 0.9 }}
-          />
-        ))}
+      {/* Right Section - Content */}
+      <div style={styles.rightSection} className="content-section">
+        <div style={styles.contentWrapper}>
+          {/* SIMS Logo */}
+          <motion.div 
+            style={styles.logoContainer}
+            initial={{ scale: 0.8, opacity: 0, y: -20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          >
+            <img 
+              src="/sims-logo.jpg" 
+              alt="SIMS Hospital Logo" 
+              style={styles.logo}
+            />
+          </motion.div>
+
+          {/* Title */}
+          <motion.h1 
+            style={styles.title}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            Welcome to SIMS Hospital
+          </motion.h1>
+          <motion.p 
+            style={styles.subtitle}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            How would you like to interact with me?
+          </motion.p>
+
+          {/* Mode Selection Cards */}
+          <div style={styles.cardsContainer} className="cards-container">
+            {/* Chat Mode Card */}
+            <motion.button
+              onClick={() => setMode('chat')}
+              style={styles.card}
+              className="mode-card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.1 }}
+              whileHover={{ 
+                scale: 1.03, 
+                borderColor: 'rgba(59, 130, 246, 0.5)',
+                boxShadow: '0 20px 60px rgba(59, 130, 246, 0.25)',
+                transition: { duration: 0.1 }
+              }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
+                <svg width="28" height="28" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <div style={styles.cardContent}>
+                <h2 style={styles.cardTitle}>Chat Mode</h2>
+                <p style={styles.cardDescription}>Type your questions using the on-screen keyboard</p>
+              </div>
+            </motion.button>
+
+            {/* Voice Mode Card */}
+            <motion.button
+              onClick={() => setMode('voice')}
+              style={styles.card}
+              className="mode-card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.1 }}
+              whileHover={{ 
+                scale: 1.03, 
+                borderColor: 'rgba(139, 92, 246, 0.5)',
+                boxShadow: '0 20px 60px rgba(139, 92, 246, 0.25)',
+                transition: { duration: 0.1 }
+              }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(139, 92, 246, 0.2)' }}>
+                <svg width="28" height="28" fill="#8B5CF6" viewBox="0 0 24 24">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                </svg>
+              </div>
+              <div style={styles.cardContent}>
+                <h2 style={styles.cardTitle}>Voice Mode</h2>
+                <p style={styles.cardDescription}>Speak naturally in English or Tamil</p>
+              </div>
+            </motion.button>
+          </div>
+
+          {/* Quick Actions */}
+          <motion.p 
+            style={styles.quickActionsLabel}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+          >
+            Quick Actions
+          </motion.p>
+          <motion.div 
+            style={styles.quickActionsContainer}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            {quickActions.map((action, index) => (
+              <motion.button
+                key={action}
+                onClick={() => setMode('chat')}
+                style={styles.quickActionButton}
+                whileHover={{ 
+                  borderColor: 'rgba(99, 102, 241, 0.5)',
+                  color: 'white',
+                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {action}
+              </motion.button>
+            ))}
+          </motion.div>
+
+          {/* Footer */}
+          <motion.footer 
+            style={styles.footer}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
+            Need help? Speak to our reception or call 1066
+          </motion.footer>
+        </div>
       </div>
     </div>
+    </>
   );
 }

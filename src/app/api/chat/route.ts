@@ -13,41 +13,50 @@ const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk a
 3. **Hospital Information**: Answer questions about visiting hours, hospital rules, facilities, etc.
 4. **Department Guidance**: Based on symptoms, suggest which department to visit and offer to book appointments.
 5. **Doctor Information**: Provide details about doctors, their specializations, and availability.
+6. **Appointment Lookup**: Help users check if they have any existing appointments booked by searching with their name or phone number.
 
-## CRITICAL: CONVERSATION CONTEXT AWARENESS
-Before EVERY response, you MUST analyze the conversation history to understand what flow you are currently in:
-- If the previous messages show you asked "May I have your full name?" and the user responded with a name → You are in APPOINTMENT BOOKING STEP 2, do NOT use findPatient tool, just acknowledge the name and ask for phone number.
-- If you asked for a phone number and user provided digits → You are in APPOINTMENT BOOKING STEP 3, ask about department.
-- ONLY use findPatient tool when the user explicitly asks to FIND or LOCATE an admitted patient.
-- When collecting information during booking (name, phone, department), NEVER call findPatient - just store the info and proceed to next step.
+## CRITICAL RULES FOR APPOINTMENT BOOKING
 
-## APPOINTMENT BOOKING FLOW
-When a user wants to book an appointment, you MUST follow these steps IN ORDER. Ask ONE question at a time and wait for the user's response before proceeding:
+### NEVER call bookAppointment tool until you have ALL of these:
+1. Patient's full name (from conversation)
+2. Phone number (from conversation)
+3. Preferred date (from conversation)
+4. Doctor ID (from getDoctorTimeSlots result)
+5. Slot ID (from getDoctorTimeSlots result, user must select one)
 
-**Step 1 - Name**: "I will help you book an appointment. May I have your full name please?"
-**Step 2 - Phone**: After receiving name, say: "Thank you, [name]. What is your phone number?" (DO NOT call any tool here)
-**Step 3 - Department**: After receiving phone, ask: "Which department would you like to visit? We have Cardiology, Neurology, Orthopedics, General Medicine, Pediatrics, Gynecology, Dermatology, ENT, Ophthalmology, and Gastroenterology."
-**Step 4 - Show Doctors**: When they choose a department, use the getDoctorAvailability tool to get doctors in that department, then list them with their specializations.
-**Step 5 - Choose Doctor**: Ask the user to choose a doctor from the list.
-**Step 6 - Show Time Slots**: When they choose a doctor, use getDoctorTimeSlots tool to show available time slots for today.
-**Step 7 - Choose Slot**: Ask them to choose a time slot.
-**Step 8 - Confirm Booking**: Use bookAppointment tool with collected info (name, phone, doctorId, slotId) to book. Then confirm: "Your appointment is booked successfully! [Provide appointment details]"
+### APPOINTMENT BOOKING FLOW - Follow EXACTLY in order:
 
-IMPORTANT: 
-- Keep track of all information provided (name, phone, department, doctor, slot) throughout the conversation
-- If the user skips a step or provides incorrect info, gently ask again
-- Always confirm the booking details before finalizing
-- NEVER confuse booking flow with patient search - these are completely separate use cases
+**Step 1 - Name**: Say: "I will help you book an appointment. May I have your full name please?"
+- Wait for user response. Just acknowledge and move to Step 2. DO NOT call any tool.
 
-Guidelines:
-- Be warm, patient, and speak clearly (many users are elderly)
-- Use simple language, avoid medical jargon
-- DO NOT use emojis or special characters in your response.
-- STRICTLY respond in the same language as the user. If the user speaks English, respond ONLY in English. If the user speaks Tamil, respond ONLY in Tamil. Do not mix languages.
-- IMPORTANT: When you use a tool (like findPatient), you MUST generate a verbal response describing the result to the user. Do not just run the tool and stay silent.
-- When unsure, offer to connect with hospital reception
-- Always confirm important details before taking actions
-- For symptom-based queries, suggest departments but remind users this is not a medical diagnosis
+**Step 2 - Phone**: Say: "Thank you, [name]. What is your phone number?"
+- Wait for user response. Just acknowledge and move to Step 3. DO NOT call any tool.
+
+**Step 3 - Department**: Say: "Which department would you like to visit? We have Cardiology, Neurology, Orthopedics, General Medicine, Pediatrics, Gynecology, Dermatology, ENT, Ophthalmology, and Gastroenterology."
+- Wait for user response. Then call getDoctorAvailability tool.
+
+**Step 4 - Show Doctors**: After getDoctorAvailability returns, list ONLY the doctor names and their specializations. DO NOT show time slots yet. Say: "Here are the doctors available in [department]: [list doctors with name and specialization only]. Which doctor would you like to see?"
+- Wait for user to choose a doctor.
+
+**Step 5 - Ask Date**: Say: "What date would you like to book the appointment? You can say today, tomorrow, or a specific date."
+- Wait for user response. Parse the date to YYYY-MM-DD format.
+
+**Step 6 - Show Time Slots**: Call getDoctorTimeSlots with the doctor name and date. Then list available slots: "Dr. [name] has these available slots on [date]: [list times]. Which time works for you?"
+- Wait for user to choose a slot.
+
+**Step 7 - Confirm & Book**: NOW you have all 5 pieces. Call bookAppointment with: patientName, phone, appointmentDate, doctorId, slotId.
+- After success, confirm: "Your appointment is booked! Details: [patient name], [doctor name], [date], [time], [department]."
+
+## OTHER IMPORTANT RULES
+
+- ONLY use findPatient tool when user asks to FIND or LOCATE an admitted patient. NEVER use it during booking.
+- When collecting name/phone during booking, just acknowledge and ask next question. No tools needed.
+- If user gives incomplete info, gently ask again.
+- Be warm, patient, speak clearly (many users are elderly).
+- Use simple language, avoid medical jargon.
+- DO NOT use emojis or special characters.
+- Respond in the same language as the user (English or Tamil).
+- When you use a tool, you MUST provide a verbal response describing the result.
 
 Current hospital visiting hours: 10:00 AM - 12:00 PM and 4:00 PM - 7:00 PM`;
 
@@ -104,7 +113,7 @@ export async function POST(req: Request) {
         }),
 
         getDoctorAvailability: tool({
-            description: 'Get list of doctors in a specific department along with their specializations and available time slots. Use this when user asks about doctors available in a department like Cardiology, Neurology, Orthopedics, etc.',
+            description: 'Get list of doctors in a specific department with their names and specializations ONLY. DO NOT show time slots - those are shown separately via getDoctorTimeSlots after user picks a doctor and date.',
             inputSchema: z.object({
                 departmentName: z.string().optional().describe('Name of the department (e.g., Cardiology, Neurology, Orthopedics)'),
                 doctorName: z.string().optional().describe('Name of the doctor to search for'),
@@ -135,13 +144,12 @@ export async function POST(req: Request) {
                     console.log('DEBUG: Found department:', dept);
                 }
 
-                // Build query for doctors
+                // Build query for doctors - only get basic info, NOT time slots
                 let query = supabase
                     .from('doctors')
                     .select(`
                         id, name, specialization, qualification, available_days, department_id,
-                        departments (name, floor),
-                        time_slots (id, date, start_time, end_time, is_booked)
+                        departments (name, floor)
                     `);
 
                 // Filter by department ID if provided
@@ -176,14 +184,6 @@ export async function POST(req: Request) {
                         department: d.departments?.name,
                         floor: d.departments?.floor,
                         availableDays: d.available_days,
-                        availableSlots: d.time_slots
-                            ?.filter((s: any) => !s.is_booked && (!date || s.date === date))
-                            .slice(0, 5) // Limit slots to avoid overwhelming the response
-                            .map((s: any) => ({
-                                id: s.id,
-                                date: s.date,
-                                time: `${s.start_time} - ${s.end_time}`,
-                            })),
                     })),
                 };
             },
@@ -193,19 +193,21 @@ export async function POST(req: Request) {
             description: `Book an appointment with a doctor for a patient. 
 CRITICAL: DO NOT call this tool until you have collected ALL of the following from the user through conversation:
 1. Patient's full name (collected in Step 1)
-2. Phone number (collected in Step 2)  
-3. Doctor ID (obtained after user selects a doctor from the list in Step 5)
-4. Slot ID (obtained after user selects a time slot in Step 7)
+2. Phone number (collected in Step 2)
+3. Preferred appointment date (collected in Step 5)
+4. Doctor ID (obtained from getDoctorTimeSlots result after user selects a doctor)
+5. Slot ID (obtained after user selects a time slot)
 
-If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, continue the conversation to collect the missing information.`,
+If you do not have ALL 5 pieces of information, DO NOT call this tool. Instead, continue the conversation to collect the missing information.`,
             inputSchema: z.object({
                 patientName: z.string().min(1).describe('Full name of the patient - REQUIRED, must be collected from user'),
                 phone: z.string().min(1).describe('Phone number of the patient - REQUIRED, must be collected from user'),
+                appointmentDate: z.string().describe('Date of the appointment in YYYY-MM-DD format - REQUIRED, must be collected from user'),
                 slotId: z.number().positive().describe('ID of the time slot to book - REQUIRED, user must select from available slots'),
                 doctorId: z.number().positive().describe('ID of the doctor - REQUIRED, user must select a doctor first'),
             }),
-            execute: async ({ patientName, phone, slotId, doctorId }) => {
-                console.log('DEBUG: bookAppointment called with:', { patientName, phone, slotId, doctorId });
+            execute: async ({ patientName, phone, appointmentDate, slotId, doctorId }) => {
+                console.log('DEBUG: bookAppointment called with:', { patientName, phone, appointmentDate, slotId, doctorId });
 
                 // Get doctor and slot details for confirmation
                 const { data: slotData } = await supabase
@@ -231,7 +233,7 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                     return { error: 'Failed to book time slot. It may already be booked.' };
                 }
 
-                // Create the appointment
+                // Create the appointment with date
                 const { data, error } = await supabase
                     .from('appointments')
                     .insert({
@@ -239,6 +241,7 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                         phone,
                         doctor_id: doctorId,
                         slot_id: slotId,
+                        appointment_date: appointmentDate,
                         status: 'confirmed',
                     })
                     .select()
@@ -266,13 +269,14 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
         }),
 
         getDoctorTimeSlots: tool({
-            description: 'Get available time slots for a specific doctor today. Use this when the user has chosen a doctor and needs to see available times.',
+            description: 'Get available time slots for a specific doctor on a specific date. Use this AFTER user has chosen a doctor AND provided their preferred date.',
             inputSchema: z.object({
                 doctorName: z.string().optional().describe('Name of the doctor'),
                 doctorId: z.number().optional().describe('ID of the doctor if known'),
+                date: z.string().optional().describe('Date to check availability for in YYYY-MM-DD format. If not provided, defaults to today.'),
             }),
-            execute: async ({ doctorName, doctorId }) => {
-                console.log('DEBUG: getDoctorTimeSlots called with:', { doctorName, doctorId });
+            execute: async ({ doctorName, doctorId, date }) => {
+                console.log('DEBUG: getDoctorTimeSlots called with:', { doctorName, doctorId, date });
 
                 let docId = doctorId;
                 let doctorInfo: any = null;
@@ -305,19 +309,46 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                     return { message: 'Please provide a doctor name or ID.' };
                 }
 
-                // Get today's date in YYYY-MM-DD format
-                const today = new Date().toISOString().split('T')[0];
+                // Use provided date or default to today
+                const targetDate = date || new Date().toISOString().split('T')[0];
 
-                // Fetch available slots for this doctor today
+                // Validate date range: must be between today and today+7 days
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayStr = today.toISOString().split('T')[0];
+
+                const maxDate = new Date(today);
+                maxDate.setDate(maxDate.getDate() + 7);
+                const maxDateStr = maxDate.toISOString().split('T')[0];
+
+                if (targetDate < todayStr) {
+                    return {
+                        doctorId: docId,
+                        doctorName: doctorInfo?.name,
+                        date: targetDate,
+                        message: `Cannot book appointments for past dates. Please choose today or a future date within the next 7 days.`
+                    };
+                }
+
+                if (targetDate > maxDateStr) {
+                    return {
+                        doctorId: docId,
+                        doctorName: doctorInfo?.name,
+                        date: targetDate,
+                        message: `You can only book appointments for the next 7 days (until ${maxDateStr}). Please choose an earlier date.`
+                    };
+                }
+
+                // Fetch available slots for this doctor on the target date
                 const { data: slots, error } = await supabase
                     .from('time_slots')
                     .select('id, date, start_time, end_time, is_booked')
                     .eq('doctor_id', docId)
-                    .eq('date', today)
+                    .eq('date', targetDate)
                     .eq('is_booked', false)
                     .order('start_time');
 
-                console.log('DEBUG: Time slots for doctor:', { docId, today, slots, error });
+                console.log('DEBUG: Time slots for doctor:', { docId, targetDate, slots, error });
 
                 if (error) {
                     console.error('DEBUG: getDoctorTimeSlots error:', error);
@@ -328,7 +359,8 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                     return {
                         doctorId: docId,
                         doctorName: doctorInfo?.name,
-                        message: `No available slots for ${doctorInfo?.name || 'this doctor'} today. Would you like to check another day or choose a different doctor?`
+                        date: targetDate,
+                        message: `No available slots for ${doctorInfo?.name || 'this doctor'} on ${targetDate}. Would you like to check another date or choose a different doctor?`
                     };
                 }
 
@@ -337,7 +369,7 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                     doctorName: doctorInfo?.name,
                     specialization: doctorInfo?.specialization,
                     department: doctorInfo?.departments?.name,
-                    date: today,
+                    date: targetDate,
                     availableSlots: slots.map((s: any) => ({
                         id: s.id,
                         time: `${s.start_time} - ${s.end_time}`,
@@ -407,6 +439,90 @@ If you do not have ALL 4 pieces of information, DO NOT call this tool. Instead, 
                 return {
                     suggestedDepartments: suggestions.length > 0 ? suggestions : ['General Medicine'],
                     disclaimer: 'This is only a suggestion based on keywords. Please consult with a doctor for proper diagnosis.',
+                };
+            },
+        }),
+
+        getAppointmentDetails: tool({
+            description: 'Look up existing appointments for a patient by their name and/or phone number. Use this when a user asks if they have any appointments booked or wants to check their appointment details.',
+            inputSchema: z.object({
+                patientName: z.string().optional().describe('Name of the patient to search for'),
+                phone: z.string().optional().describe('Phone number of the patient'),
+            }),
+            execute: async ({ patientName, phone }) => {
+                console.log('DEBUG: getAppointmentDetails called with:', { patientName, phone });
+
+                if (!patientName && !phone) {
+                    return { message: 'Please provide either your name or phone number to look up your appointments.' };
+                }
+
+                // Build the query with joins to get full appointment details
+                let query = supabase
+                    .from('appointments')
+                    .select(`
+                        id,
+                        patient_name,
+                        phone,
+                        appointment_date,
+                        status,
+                        created_at,
+                        doctors (
+                            id,
+                            name,
+                            specialization,
+                            departments (
+                                name,
+                                floor
+                            )
+                        ),
+                        time_slots (
+                            date,
+                            start_time,
+                            end_time
+                        )
+                    `)
+                    .order('appointment_date', { ascending: false });
+
+                // Apply filters based on what was provided
+                if (patientName && phone) {
+                    // If both provided, match both (more precise)
+                    query = query.ilike('patient_name', `%${patientName}%`).eq('phone', phone);
+                } else if (patientName) {
+                    query = query.ilike('patient_name', `%${patientName}%`);
+                } else if (phone) {
+                    query = query.eq('phone', phone);
+                }
+
+                const { data, error } = await query.limit(10);
+
+                console.log('DEBUG: Appointments query result:', { data, error });
+
+                if (error) {
+                    console.error('DEBUG: getAppointmentDetails error:', error);
+                    return { error: 'Failed to fetch appointment details' };
+                }
+
+                if (!data || data.length === 0) {
+                    return {
+                        message: `No appointments found${patientName ? ` for "${patientName}"` : ''}${phone ? ` with phone number ${phone}` : ''}. Would you like to book a new appointment?`
+                    };
+                }
+
+                return {
+                    appointments: data.map((apt: any) => ({
+                        id: apt.id,
+                        patientName: apt.patient_name,
+                        phone: apt.phone,
+                        doctorName: apt.doctors?.name,
+                        specialization: apt.doctors?.specialization,
+                        department: apt.doctors?.departments?.name,
+                        floor: apt.doctors?.departments?.floor,
+                        date: apt.time_slots?.date || apt.appointment_date,
+                        time: apt.time_slots ? `${apt.time_slots.start_time} - ${apt.time_slots.end_time}` : null,
+                        status: apt.status,
+                        bookedOn: apt.created_at,
+                    })),
+                    message: `Found ${data.length} appointment(s)`,
                 };
             },
         }),

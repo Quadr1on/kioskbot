@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import AnimatedOrb from './AnimatedOrb';
 import LanguageSelector from './LanguageSelector';
+import { getPreloadedGreeting, areGreetingsLoaded, preloadGreetings, GREETINGS } from '@/lib/greetingCache';
 
 interface VoiceModeProps {
   onSwitchToChat?: () => void;
@@ -26,11 +27,6 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   // Use a ref to track conversation history reliably (avoids React state update race conditions)
   const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
   
-  // Pre-loaded greeting audio refs
-  const greetingAudioEnRef = useRef<string | null>(null);
-  const greetingAudioTaRef = useRef<string | null>(null);
-  const greetingsLoadedRef = useRef(false);
-  
   // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -47,45 +43,11 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const SPEECH_THRESHOLD = 25; // Higher threshold to detect actual speech
   const SILENCE_FRAMES_REQUIRED = 15; // ~750ms at 50ms intervals (more forgiving)
   
-  // Pre-fetch greeting audio on component mount
+  // Ensure greetings are loaded (fallback if not preloaded on home page)
   useEffect(() => {
-    const preloadGreetings = async () => {
-      if (greetingsLoadedRef.current) return;
-      greetingsLoadedRef.current = true;
-      
-      // Pre-fetch English greeting
-      const enGreeting = 'Welcome to SIMS Assistant. How can I help you today?';
-      const taGreeting = 'SIMS உதவியாளருக்கு வரவேற்கிறோம். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?';
-      
-      try {
-        const [enResponse, taResponse] = await Promise.all([
-          fetch('/api/voice/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: enGreeting, language: 'en-IN' }),
-          }),
-          fetch('/api/voice/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: taGreeting, language: 'ta-IN' }),
-          }),
-        ]);
-        
-        if (enResponse.ok) {
-          const enData = await enResponse.json();
-          if (enData.audio) greetingAudioEnRef.current = enData.audio;
-        }
-        if (taResponse.ok) {
-          const taData = await taResponse.json();
-          if (taData.audio) greetingAudioTaRef.current = taData.audio;
-        }
-        console.log('DEBUG: Greeting audio pre-loaded');
-      } catch (error) {
-        console.error('Failed to pre-load greetings:', error);
-      }
-    };
-    
-    preloadGreetings();
+    if (!areGreetingsLoaded()) {
+      preloadGreetings();
+    }
   }, []);
 
   // Styles matching the new design language
@@ -477,12 +439,12 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const playGreeting = async (lang: 'en-IN' | 'ta-IN') => {
     setStatus('greeting');
     
-    // Try to use pre-loaded audio first
-    const preloadedAudio = lang === 'en-IN' ? greetingAudioEnRef.current : greetingAudioTaRef.current;
+    // Try to use pre-loaded audio from shared cache first
+    const preloadedAudio = getPreloadedGreeting(lang);
     
     if (preloadedAudio) {
       // Use pre-loaded audio - instant playback!
-      console.log('DEBUG: Using pre-loaded greeting audio');
+      console.log('DEBUG: Using pre-loaded greeting audio from cache');
       if (responseAudioRef.current) {
         responseAudioRef.current.pause();
       }
@@ -507,9 +469,7 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
     
     // Fallback: fetch greeting audio if pre-load failed
     console.log('DEBUG: Pre-loaded audio not available, fetching fresh');
-    const greetingText = lang === 'en-IN' 
-      ? 'Welcome to SIMS Assistant. How can I help you today?' 
-      : 'SIMS உதவியாளருக்கு வரவேற்கிறோம். இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?';
+    const greetingText = lang === 'en-IN' ? GREETINGS.en : GREETINGS.ta;
     
     try {
       const response = await fetch('/api/voice/tts', {

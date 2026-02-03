@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   phone VARCHAR(20) NOT NULL,
   doctor_id INTEGER REFERENCES doctors(id) ON DELETE CASCADE,
   slot_id INTEGER REFERENCES time_slots(id) ON DELETE CASCADE,
+  appointment_date DATE,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()

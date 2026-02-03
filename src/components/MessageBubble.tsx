@@ -93,13 +93,14 @@ export default function MessageBubble({ role, content, isLoading }: MessageBubbl
           padding: isUser ? '10px 16px' : '12px 16px',
           borderRadius: isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
           background: isUser 
-            ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
-            : '#f3f4f6',
-          color: isUser ? 'white' : '#1f2937',
+            ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' 
+            : '#212121',
+          color: isUser ? 'white' : 'white',
           wordBreak: 'break-word',
           boxShadow: isUser 
             ? '0 4px 12px rgba(59, 130, 246, 0.25)' 
-            : '0 2px 8px rgba(0, 0, 0, 0.06)',
+            : '0 2px 8px rgba(0, 0, 0, 0.2)',
+          border: isUser ? 'none' : '1px solid #3a3a3a',
           transition: 'all 0.2s',
         }}
       >
