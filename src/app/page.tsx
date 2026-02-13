@@ -43,7 +43,7 @@ export default function Home() {
   }
 
   if (mode === 'voice') {
-    return <VoiceMode onSwitchToChat={() => setMode('chat')} />;
+    return <VoiceMode onClose={() => setMode('select')} />;
   }
 
   // Inline styles for split-screen layout

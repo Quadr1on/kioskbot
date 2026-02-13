@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { createNoise3D } from 'simplex-noise';
 
 interface AnimatedOrbProps {
-  state: 'idle' | 'greeting' | 'recording' | 'processing' | 'speaking';
+  state: 'idle' | 'greeting' | 'recording' | 'listening' | 'processing' | 'speaking';
   analyser?: AnalyserNode | null;
 }
 

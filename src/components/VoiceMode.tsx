@@ -1,153 +1,233 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Clock } from 'lucide-react';
 import AnimatedOrb from './AnimatedOrb';
 import LanguageSelector from './LanguageSelector';
-import { getPreloadedGreeting, areGreetingsLoaded, preloadGreetings, GREETINGS } from '@/lib/greetingCache';
 
 interface VoiceModeProps {
-  onSwitchToChat?: () => void;
+  onClose: () => void;
 }
 
-export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
-  const [hasSelectedLanguage, setHasSelectedLanguage] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'greeting' | 'recording' | 'processing' | 'speaking'>('idle');
-  const [language, setLanguage] = useState<'en-IN' | 'ta-IN'>('en-IN');
-  const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
-  const [hasPlayedGreeting, setHasPlayedGreeting] = useState(false);
-  
-  // Transcript state for display
+// Gemini Live API WebSocket URL
+const GEMINI_WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
+
+// System prompt (same as chat route)
+const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk at SIMS Hospital in Chennai. You help patients and visitors with:
+
+1. Finding Patients: Help locate admitted patients by name and provide their room number and department.
+2. Booking Appointments: Help book appointments with doctors, showing available time slots.
+3. Hospital Information: Answer questions about visiting hours, hospital rules, facilities, etc.
+4. Department Guidance: Based on symptoms, suggest which department to visit and offer to book appointments.
+5. Doctor Information: Provide details about doctors, their specializations, and availability.
+6. Appointment Lookup: Help users check existing appointments by name or phone number.
+
+CRITICAL RULES FOR APPOINTMENT BOOKING:
+- NEVER call bookAppointment until you have ALL: name, phone, date, doctorId, slotId.
+- Follow booking flow: Name → Phone → Department → Doctor → Date → Time Slot → Book.
+- Be warm, patient, speak clearly.
+- Use simple language, avoid medical jargon.
+- Keep responses concise for voice.
+- Respond in same language as user.
+
+Current hospital visiting hours: 10:00 AM - 12:00 PM and 4:00 PM - 7:00 PM`;
+
+// Tool declarations for Gemini
+const TOOL_DECLARATIONS = [
+  {
+    name: 'getDepartments',
+    description: 'Get list of all departments in the hospital',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'getDoctorAvailability',
+    description: 'Get list of doctors in a specific department.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        departmentName: { type: 'STRING', description: 'Department name' },
+        doctorName: { type: 'STRING', description: 'Doctor name to search' },
+      },
+    },
+  },
+  {
+    name: 'getDoctorTimeSlots',
+    description: 'Get available time slots for a doctor on a date.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        doctorName: { type: 'STRING', description: 'Doctor name' },
+        doctorId: { type: 'NUMBER', description: 'Doctor ID if known' },
+        date: { type: 'STRING', description: 'Date YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'bookAppointment',
+    description: 'Book appointment. ONLY when you have ALL required info.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        patientName: { type: 'STRING', description: 'Patient full name' },
+        phone: { type: 'STRING', description: 'Phone number' },
+        appointmentDate: { type: 'STRING', description: 'Date YYYY-MM-DD' },
+        slotId: { type: 'NUMBER', description: 'Time slot ID' },
+        doctorId: { type: 'NUMBER', description: 'Doctor ID' },
+      },
+      required: ['patientName', 'phone', 'appointmentDate', 'slotId', 'doctorId'],
+    },
+  },
+  {
+    name: 'findPatient',
+    description: 'Find admitted patient by name',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        patientName: { type: 'STRING', description: 'Patient name' },
+      },
+      required: ['patientName'],
+    },
+  },
+  {
+    name: 'getHospitalInfo',
+    description: 'Get hospital info (visiting hours, rules, etc)',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: 'What info user wants' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'suggestDepartment',
+    description: 'Suggest department based on symptoms',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        symptoms: { type: 'STRING', description: 'Patient symptoms' },
+      },
+      required: ['symptoms'],
+    },
+  },
+  {
+    name: 'getAppointmentDetails',
+    description: 'Look up existing appointments by name/phone',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        patientName: { type: 'STRING', description: 'Patient name' },
+        phone: { type: 'STRING', description: 'Phone number' },
+      },
+    },
+  },
+];
+
+export default function VoiceMode({ onClose }: VoiceModeProps) {
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'listening' | 'processing' | 'speaking'>('idle');
   const [userTranscript, setUserTranscript] = useState<string>('');
   const [aiTranscript, setAiTranscript] = useState<string>('');
   const [currentSpeaker, setCurrentSpeaker] = useState<'user' | 'ai' | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Time slot buttons state
+  // Time slot buttons
   const [timeSlots, setTimeSlots] = useState<{ id: number; time: string }[]>([]);
   const [showTimeSlots, setShowTimeSlots] = useState(false);
-  
-  // Use a ref to track conversation history reliably (avoids React state update race conditions)
-  const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
-  
-  // Audio Refs
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const responseAudioRef = useRef<HTMLAudioElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  
-  // Silence detection refs
-  const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const silentFramesRef = useRef<number>(0);
-  const hasSpeechStartedRef = useRef<boolean>(false); // Track if user has started speaking
-  const SILENCE_THRESHOLD = 15; // Audio level threshold (0-255)
-  const SPEECH_THRESHOLD = 25; // Higher threshold to detect actual speech
-  const SILENCE_FRAMES_REQUIRED = 15; // ~750ms at 50ms intervals (more forgiving)
-  
-  // Ensure greetings are loaded (fallback if not preloaded on home page)
-  useEffect(() => {
-    if (!areGreetingsLoaded()) {
-      preloadGreetings();
-    }
-  }, []);
 
-  // Styles matching the new design language
-  const styles = {
+  // Refs
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioQueueRef = useRef<Float32Array[]>([]);
+  const isPlayingRef = useRef(false);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const isConnectedRef = useRef(false);
+  const gainNodeRef = useRef<GainNode | null>(null);
+
+  // Styles
+  const styles: Record<string, React.CSSProperties> = {
     container: {
-      position: 'relative' as const,
-      minHeight: '100vh',
-      backgroundColor: 'black',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column' as const,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    backgroundGlow: {
-      position: 'absolute' as const,
+      position: 'fixed',
       inset: 0,
-      background: 'radial-gradient(circle at center, rgba(30, 64, 175, 0.2), black, black)',
-      pointerEvents: 'none' as const,
+      background: '#000000',
+      zIndex: 50,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
     },
-    exitButtonContainer: {
-      position: 'absolute' as const,
-      top: '24px',
-      left: '24px',
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '16px 24px',
+      position: 'relative',
       zIndex: 10,
     },
-    exitButton: {
+    titleWrapper: {
       display: 'flex',
       alignItems: 'center',
-      gap: '8px',
-      background: 'transparent',
-      border: 'none',
+      gap: '12px',
+    },
+    title: {
+      color: 'white',
+      fontSize: '18px',
+      fontWeight: 600,
+    },
+    statusDot: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      background: status === 'listening' ? '#22c55e' : status === 'processing' ? '#f59e0b' : status === 'speaking' ? '#3b82f6' : '#6b7280',
+      boxShadow: status === 'listening' ? '0 0 8px #22c55e' : 'none',
+    },
+    closeButton: {
       color: '#9ca3af',
       cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: 500,
-      transition: 'color 0.2s',
-    },
-    languageBadgeContainer: {
-      position: 'absolute' as const,
-      top: '24px',
-      right: '24px',
-      zIndex: 10,
-    },
-    languageBadge: {
-      padding: '4px 12px',
-      backgroundColor: '#1f2937',
-      borderRadius: '9999px',
-      fontSize: '12px',
-      color: '#d1d5db',
-      border: '1px solid #374151',
-    },
-    mainContent: {
-      position: 'relative' as const,
-      zIndex: 0,
+      padding: '8px',
+      borderRadius: '8px',
+      background: 'rgba(255,255,255,0.05)',
+      border: 'none',
       display: 'flex',
-      flexDirection: 'column' as const,
       alignItems: 'center',
       justifyContent: 'center',
-      width: '100%',
-      maxWidth: '512px',
-      padding: '0 24px',
+      transition: 'all 0.2s',
+    },
+    mainContent: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
     },
     orbContainer: {
       cursor: 'pointer',
-      transform: 'scale(1)',
-      transition: 'transform 0.3s',
+      transition: 'transform 0.3s ease',
     },
-    statusTextContainer: {
-      marginTop: '48px',
-      textAlign: 'center' as const,
+    transcriptArea: {
+      position: 'absolute',
+      bottom: '80px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: '80%',
+      maxWidth: '600px',
+      textAlign: 'center',
+    },
+    transcriptText: {
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontSize: '16px',
+      lineHeight: 1.5,
+      textShadow: '0 0 20px rgba(100, 100, 255, 0.3)',
     },
     statusText: {
       color: '#9ca3af',
-      fontSize: '18px',
-      fontWeight: 500,
-      letterSpacing: '0.025em',
-      margin: 0,
-    },
-    transcriptContainer: {
-      marginTop: '24px',
-      textAlign: 'center' as const,
-      maxWidth: '400px',
-      minHeight: '60px',
-    },
-    transcriptText: {
-      color: '#e5e7eb',
-      fontSize: '16px',
-      lineHeight: 1.6,
-      display: 'flex',
-      flexWrap: 'wrap' as const,
-      justifyContent: 'center',
-      gap: '6px',
-    },
-    transcriptWord: {
-      display: 'inline-block',
+      fontSize: '14px',
+      textAlign: 'center',
+      padding: '16px',
+      letterSpacing: '0.05em',
     },
     speakerLabel: {
       color: '#6b7280',
@@ -156,7 +236,6 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       letterSpacing: '0.1em',
       marginBottom: '8px',
     },
-    // Time slot button styles
     timeSlotsOverlay: {
       position: 'absolute' as const,
       right: '24px',
@@ -201,468 +280,422 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
     },
   };
 
-  // Animation variants for word-by-word reveal
-  const containerVariants = {
-    hidden: {},
-    visible: {
-      transition: {
-        staggerChildren: 0.06,
-      },
-    },
-  };
-
   const wordVariants = {
-    hidden: { opacity: 0, y: 8 },
-    visible: { 
-      opacity: 1, 
+    hidden: { opacity: 0, y: 10 },
+    visible: (i: number) => ({
+      opacity: 1,
       y: 0,
-      transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] as const }
-    },
+      transition: { delay: i * 0.05, duration: 0.3, ease: 'easeOut' },
+    }),
   };
 
-  // Initialize Audio Context
-  const initAudioContext = () => {
-    if (!audioContextRef.current) {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioContext();
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-    }
-    if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-    }
-  };
-
-  const startRecording = async () => {
+  // Execute tool call via server API
+  const executeTool = useCallback(async (functionName: string, args: any) => {
+    console.log('DEBUG: Executing tool:', functionName, args);
     try {
-      initAudioContext();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      // Connect stream to analyser
-      if (audioContextRef.current && analyserRef.current) {
-          const source = audioContextRef.current.createMediaStreamSource(stream);
-          source.connect(analyserRef.current);
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        // Clear silence detection
-        if (silenceCheckIntervalRef.current) {
-          clearInterval(silenceCheckIntervalRef.current);
-          silenceCheckIntervalRef.current = null;
-        }
-        silentFramesRef.current = 0;
-        
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        
-        // Stop all tracks
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-
-        // Only process if we have audio data
-        if (audioChunksRef.current.length > 0) {
-          setStatus('processing');
-          await processAudio(audioBlob);
-        } else {
-          // No audio captured, restart recording
-          startRecording();
-        }
-      };
-
-      mediaRecorder.start(100); // Collect data every 100ms for better chunking
-      setStatus('recording');
-      
-      // Start silence detection - but only trigger AFTER user starts speaking
-      silentFramesRef.current = 0;
-      hasSpeechStartedRef.current = false; // Reset speech detection flag
-      
-      silenceCheckIntervalRef.current = setInterval(() => {
-        if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
-          return;
-        }
-        
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        
-        // First, check if user has started speaking
-        if (!hasSpeechStartedRef.current) {
-          if (average >= SPEECH_THRESHOLD) {
-            // User has started speaking!
-            hasSpeechStartedRef.current = true;
-            silentFramesRef.current = 0;
-            console.log('DEBUG: Speech detected, now tracking silence');
-          }
-          // If user hasn't started speaking yet, don't do anything - keep listening
-          return;
-        }
-        
-        // User has started speaking - now track silence
-        if (average < SILENCE_THRESHOLD) {
-          silentFramesRef.current++;
-          // Check if we've had enough silent frames after speech
-          if (silentFramesRef.current >= SILENCE_FRAMES_REQUIRED && audioChunksRef.current.length > 0) {
-            // User spoke and then stopped - process the audio
-            console.log('DEBUG: Silence detected after speech, stopping recording');
-            stopRecording();
-          }
-        } else {
-          // Reset silence counter when voice is detected
-          silentFramesRef.current = 0;
-        }
-      }, 50); // Check every 50ms
-      
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      alert('Could not access microphone');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const processAudio = async (audioBlob: Blob) => {
-    try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-      formData.append('language', language);
-
-      const sttResponse = await fetch('/api/voice/stt', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!sttResponse.ok) throw new Error('STT failed');
-      const sttData = await sttResponse.json();
-      const text = sttData.transcript;
-
-      if (!text) {
-          setStatus('idle');
-          return;
-      }
-
-      // Set user transcript for display animation
-      setCurrentSpeaker('user');
-      setUserTranscript(text);
-      setAiTranscript('');
-      setIsAnimating(true);
-
-      await handleTranscript(text);
-    } catch (error) {
-      console.error('Processing error:', error);
-      setStatus('idle');
-    }
-  };
-
-  const handleTranscript = async (text: string) => {
-    // Use ref for reliable history tracking (avoids React state race conditions)
-    const previousHistory = [...conversationHistoryRef.current]; // Save for rollback
-    const newHistory = [...previousHistory, { role: 'user', content: text }];
-    conversationHistoryRef.current = newHistory;
-    setConversationHistory(newHistory);
-    
-    console.log('DEBUG: Sending conversation history to LLM:', JSON.stringify(newHistory, null, 2));
-
-    try {
-      // Use non-streaming mode for voice - waits for complete response including tool results
-      const chatResponse = await fetch('/api/chat', {
+      const response = await fetch('/api/voice/execute-tool', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newHistory, stream: false }),
+        body: JSON.stringify({ functionName, args }),
       });
+      const result = await response.json();
+      console.log('DEBUG: Tool result:', result);
 
-      if (!chatResponse.ok) {
-        console.error('Chat API error:', chatResponse.status);
-        throw new Error(`Chat failed with status ${chatResponse.status}`);
-      }
-
-      const data = await chatResponse.json();
-      const fullResponse = data.text || '';
-
-      console.log('DEBUG: VoiceMode received response:', fullResponse);
-      console.log('DEBUG: VoiceMode toolResults:', data.toolResults);
-
-      // Check if the response contains time slot data from getDoctorTimeSlots
-      let detectedSlots: { id: number; time: string }[] = [];
-      if (data.toolResults && Array.isArray(data.toolResults)) {
-        for (const result of data.toolResults) {
-          if (result && result.availableSlots && Array.isArray(result.availableSlots)) {
-            detectedSlots = result.availableSlots;
-            break;
-          }
-        }
-      }
-
-      if (detectedSlots.length > 0) {
-        // Show time slot buttons instead of reading them all out
-        setTimeSlots(detectedSlots);
+      // Check for time slots
+      if (result.availableSlots && Array.isArray(result.availableSlots)) {
+        setTimeSlots(result.availableSlots);
         setShowTimeSlots(true);
-        console.log('DEBUG: Detected time slots, showing buttons:', detectedSlots);
       }
 
-      // Update both ref and state with the assistant's response
-      const updatedHistory = [...newHistory, { role: 'assistant', content: fullResponse }];
-      conversationHistoryRef.current = updatedHistory;
-      setConversationHistory(updatedHistory);
-
-      if (fullResponse && fullResponse.trim().length > 0) {
-        // If time slots are shown, don't auto-restart recording — wait for button tap
-        await playTTS(fullResponse, detectedSlots.length === 0);
-      } else {
-        console.log('DEBUG: No text response from LLM');
-        setStatus('idle');
-        // Restart recording even on empty response
-        setTimeout(() => startRecording(), 300);
-      }
+      return result;
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('DEBUG: Tool error:', error);
+      return { error: 'Tool execution failed' };
+    }
+  }, []);
+
+  // ---- Audio Playback ----
+
+  // Decode base64 PCM (16-bit, 24kHz) to Float32Array
+  const decodePCM = (base64: string): Float32Array => {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const pcm16 = new Int16Array(bytes.buffer);
+    const float32 = new Float32Array(pcm16.length);
+    for (let i = 0; i < pcm16.length; i++) {
+      float32[i] = pcm16[i] / 32768.0;
+    }
+    return float32;
+  };
+
+  // Play audio from queue
+  const playAudioQueue = useCallback(async () => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    isPlayingRef.current = true;
+    setStatus('speaking');
+    setCurrentSpeaker('ai');
+
+    while (audioQueueRef.current.length > 0) {
+      const float32 = audioQueueRef.current.shift()!;
+      const ctx = audioContextRef.current;
+      if (!ctx || ctx.state === 'closed') break;
+
+      // Resume if suspended
+      if (ctx.state === 'suspended') await ctx.resume();
+
+      const audioBuffer = ctx.createBuffer(1, float32.length, 24000);
+      audioBuffer.getChannelData(0).set(float32);
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+
+      // Route through analyser → gain → destination
+      if (analyserRef.current && gainNodeRef.current) {
+        source.connect(analyserRef.current);
+        analyserRef.current.connect(gainNodeRef.current);
+        gainNodeRef.current.connect(ctx.destination);
+      } else {
+        source.connect(ctx.destination);
+      }
+
+      source.start();
+      await new Promise<void>(resolve => { source.onended = () => resolve(); });
+    }
+
+    isPlayingRef.current = false;
+    setStatus('listening');
+    setCurrentSpeaker(null);
+    setIsAnimating(false);
+  }, []);
+
+  // ---- WebSocket Connection ----
+
+  const connectToGemini = useCallback(async (language: string) => {
+    try {
+      setStatus('processing');
+      console.log('DEBUG: Starting Gemini Live connection...');
+
+      // Get API key
+      const keyRes = await fetch('/api/voice/gemini-token');
+      const keyData = await keyRes.json();
+      if (!keyData.apiKey) {
+        console.error('DEBUG: No API key');
+        return;
+      }
+
+      // Create audio context for playback at 24kHz
+      const audioCtx = new AudioContext({ sampleRate: 24000 });
+      audioContextRef.current = audioCtx;
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.0;
+      gainNodeRef.current = gainNode;
+
+      // Connect WebSocket
+      const wsUrl = `${GEMINI_WS_URL}?key=${keyData.apiKey}`;
+      console.log('DEBUG: Connecting to WebSocket...');
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('DEBUG: WebSocket connected! Sending setup...');
+        isConnectedRef.current = true;
+
+        const languageInstruction = language === 'ta-IN'
+          ? '\nIMPORTANT: The user speaks Tamil. Respond in Tamil. Greet with "SIMS மருத்துவமனைக்கு வரவேற்கிறோம்!".'
+          : '\nGreet the user with "Welcome to SIMS Hospital! How can I help you today?"';
+
+        // Send BidiGenerateContentSetup
+        const setupMessage = {
+          setup: {
+            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+            },
+            systemInstruction: {
+              parts: [{ text: SYSTEM_PROMPT + languageInstruction }],
+            },
+            tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+          },
+        };
+
+        ws.send(JSON.stringify(setupMessage));
+        console.log('DEBUG: Setup message sent');
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          let data: any;
+          if (event.data instanceof Blob) {
+            const text = await event.data.text();
+            data = JSON.parse(text);
+          } else {
+            data = JSON.parse(event.data);
+          }
+
+          console.log('DEBUG: WS message:', Object.keys(data));
+
+          // Setup complete
+          if (data.setupComplete) {
+            console.log('DEBUG: Setup complete! Starting mic...');
+            await startMicCapture();
+            setStatus('listening');
+            return;
+          }
+
+          // Server content (audio/text response)
+          if (data.serverContent) {
+            const sc = data.serverContent;
+
+            if (sc.interrupted) {
+              console.log('DEBUG: Interrupted');
+              audioQueueRef.current.length = 0;
+              isPlayingRef.current = false;
+              return;
+            }
+
+            if (sc.modelTurn?.parts) {
+              for (const part of sc.modelTurn.parts) {
+                if (part.inlineData?.data) {
+                  setIsAnimating(true);
+                  const float32 = decodePCM(part.inlineData.data);
+                  audioQueueRef.current.push(float32);
+                  playAudioQueue();
+                }
+                if (part.text) {
+                  setAiTranscript(prev => prev + part.text);
+                }
+              }
+            }
+
+            if (sc.turnComplete) {
+              console.log('DEBUG: Turn complete');
+            }
+          }
+
+          // Tool call from Gemini
+          if (data.toolCall) {
+            console.log('DEBUG: Tool call:', data.toolCall);
+            setStatus('processing');
+
+            const functionResponses: any[] = [];
+            for (const fc of data.toolCall.functionCalls) {
+              const result = await executeTool(fc.name, fc.args || {});
+              functionResponses.push({
+                name: fc.name,
+                id: fc.id,
+                response: result,
+              });
+            }
+
+            // Send tool response back
+            const toolResponseMsg = {
+              toolResponse: { functionResponses },
+            };
+            ws.send(JSON.stringify(toolResponseMsg));
+            console.log('DEBUG: Tool response sent');
+          }
+
+        } catch (err) {
+          console.error('DEBUG: Error parsing WS message:', err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('DEBUG: WebSocket error:', error);
+      };
+
+      ws.onclose = (event) => {
+        console.log('DEBUG: WebSocket closed:', event.code, event.reason);
+        isConnectedRef.current = false;
+        setStatus('idle');
+      };
+
+    } catch (error) {
+      console.error('DEBUG: Connection error:', error);
+      setStatus('idle');
+    }
+  }, [executeTool, playAudioQueue]);
+
+  // ---- Microphone Capture ----
+
+  const startMicCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      streamRef.current = stream;
+
+      // Create a separate AudioContext for mic capture at native rate
+      // We need the worklet to handle resampling to 16kHz
+      const audioCtx = audioContextRef.current;
+      if (!audioCtx) return;
+
+      // We use a ScriptProcessorNode for broader compatibility (AudioWorklet can have issues loading)
+      // Create a separate context for mic at native sample rate
+      const micCtx = new AudioContext();
+      const source = micCtx.createMediaStreamSource(stream);
+
+      const bufferSize = 4096;
+      const scriptNode = micCtx.createScriptProcessor(bufferSize, 1, 1);
+
+      scriptNode.onaudioprocess = (e) => {
+        if (!isConnectedRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+
+        // Resample from micCtx.sampleRate to 16000
+        const ratio = micCtx.sampleRate / 16000;
+        const outputLength = Math.floor(inputData.length / ratio);
+        const pcm16 = new Int16Array(outputLength);
+
+        for (let i = 0; i < outputLength; i++) {
+          const srcIdx = Math.floor(i * ratio);
+          const sample = Math.max(-1, Math.min(1, inputData[srcIdx]));
+          pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        }
+
+        // Convert to base64
+        const bytes = new Uint8Array(pcm16.buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+
+        // Send realtime input
+        const realtimeMsg = {
+          realtimeInput: {
+            mediaChunks: [{
+              data: base64,
+              mimeType: 'audio/pcm;rate=16000',
+            }],
+          },
+        };
+        wsRef.current.send(JSON.stringify(realtimeMsg));
+      };
+
+      source.connect(scriptNode);
+      scriptNode.connect(micCtx.destination); // Required to keep it alive
       
-      // Rollback conversation history to before this message
-      // This prevents having orphan user messages without assistant responses
-      conversationHistoryRef.current = previousHistory;
-      setConversationHistory(previousHistory);
-      
-      // Play an error message to the user
-      const errorMessage = language === 'en-IN' 
-        ? 'Sorry, I had trouble processing that. Could you please repeat?' 
-        : 'மன்னிக்கவும், அதை செயலாக்குவதில் சிக்கல் ஏற்பட்டது. தயவுசெய்து மீண்டும் சொல்ல முடியுமா?';
-      
-      setStatus('speaking');
-      await playTTS(errorMessage, true);
+      console.log('DEBUG: Mic capture started at', micCtx.sampleRate, 'Hz');
+      setStatus('listening');
+    } catch (error) {
+      console.error('DEBUG: Mic access error:', error);
     }
   };
 
   // Handle time slot button selection
   const handleTimeSlotSelect = (slot: { id: number; time: string }) => {
-    // Hide the buttons
     setShowTimeSlots(false);
     setTimeSlots([]);
 
-    // Stop any ongoing TTS
-    stopSpeaking();
-
-    // Send the selection as a user message
-    const selectionText = `I'll take the ${slot.time} slot`;
-    setCurrentSpeaker('user');
-    setUserTranscript(selectionText);
-    setAiTranscript('');
-    setIsAnimating(true);
-    setStatus('processing');
-
-    // Feed it into the conversation
-    handleTranscript(selectionText);
-  };
-
-  const playTTS = async (text: string, autoRestartRecording: boolean = true) => {
-    try {
-      const response = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.audio) {
-          if (responseAudioRef.current) {
-              responseAudioRef.current.pause();
-          }
-          const audio = new Audio(`data:audio/wav;base64,${data.audio}`);
-          responseAudioRef.current = audio;
-          
-          // Set AI transcript for display animation
-          setCurrentSpeaker('ai');
-          setUserTranscript('');
-          setAiTranscript(text);
-          setIsAnimating(true);
-          
-          setStatus('speaking');
-          
-          audio.onended = () => {
-            setStatus('idle');
-            setIsAnimating(false);
-            // Auto-restart recording after speaking for continuous conversation
-            if (autoRestartRecording) {
-              setTimeout(() => startRecording(), 300);
-            }
-          };
-          await audio.play();
-        } else {
-            setStatus('idle');
-            if (autoRestartRecording) {
-              setTimeout(() => startRecording(), 300);
-            }
-        }
-      } else {
-          setStatus('idle');
-          if (autoRestartRecording) {
-            setTimeout(() => startRecording(), 300);
-          }
-      }
-    } catch (error) {
-      console.error('TTS error:', error);
-      setStatus('idle');
-      if (autoRestartRecording) {
-        setTimeout(() => startRecording(), 300);
-      }
-    }
-  };
-
-  // Play greeting when entering voice mode - uses pre-loaded audio for instant playback
-  const playGreeting = async (lang: 'en-IN' | 'ta-IN') => {
-    setStatus('greeting');
-    
-    // Try to use pre-loaded audio from shared cache first
-    const preloadedAudio = getPreloadedGreeting(lang);
-    
-    if (preloadedAudio) {
-      // Use pre-loaded audio - instant playback!
-      console.log('DEBUG: Using pre-loaded greeting audio from cache');
-      if (responseAudioRef.current) {
-        responseAudioRef.current.pause();
-      }
-      const audio = new Audio(`data:audio/wav;base64,${preloadedAudio}`);
-      responseAudioRef.current = audio;
-      
-      audio.onended = () => {
-        setHasPlayedGreeting(true);
-        setStatus('idle');
-        // Auto-start recording after greeting
-        setTimeout(() => startRecording(), 300);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const selectionText = `I want the ${slot.time} slot. The slot ID is ${slot.id}.`;
+      const clientMsg = {
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: selectionText }] }],
+          turnComplete: true,
+        },
       };
-      
-      try {
-        await audio.play();
-        return;
-      } catch (error) {
-        console.error('Failed to play pre-loaded audio:', error);
-        // Fall through to fetch fresh audio
-      }
-    }
-    
-    // Fallback: fetch greeting audio if pre-load failed
-    console.log('DEBUG: Pre-loaded audio not available, fetching fresh');
-    const greetingText = lang === 'en-IN' ? GREETINGS.en : GREETINGS.ta;
-    
-    try {
-      const response = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: greetingText, language: lang }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.audio) {
-          if (responseAudioRef.current) {
-            responseAudioRef.current.pause();
-          }
-          const audio = new Audio(`data:audio/wav;base64,${data.audio}`);
-          responseAudioRef.current = audio;
-          
-          audio.onended = () => {
-            setHasPlayedGreeting(true);
-            setStatus('idle');
-            setTimeout(() => startRecording(), 300);
-          };
-          await audio.play();
-        } else {
-          setHasPlayedGreeting(true);
-          setStatus('idle');
-          setTimeout(() => startRecording(), 300);
-        }
-      } else {
-        setHasPlayedGreeting(true);
-        setStatus('idle');
-        setTimeout(() => startRecording(), 300);
-      }
-    } catch (error) {
-      console.error('Greeting TTS error:', error);
-      setHasPlayedGreeting(true);
-      setStatus('idle');
-      setTimeout(() => startRecording(), 300);
+      wsRef.current.send(JSON.stringify(clientMsg));
+      setCurrentSpeaker('user');
+      setUserTranscript(selectionText);
+      setAiTranscript('');
+      setStatus('processing');
     }
   };
 
-  const stopSpeaking = () => {
-      if (responseAudioRef.current) {
-          responseAudioRef.current.pause();
-          responseAudioRef.current = null;
+  // Handle language selection
+  const handleLanguageSelect = (language: string) => {
+    setSelectedLanguage(language);
+    connectToGemini(language);
+  };
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
-      setStatus('idle');
-  };
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      isConnectedRef.current = false;
+    };
+  }, []);
 
-  // Toggle recording
-  const toggleRecording = () => {
-    if (status === 'idle') {
-        startRecording();
-    } else if (status === 'recording') {
-        stopRecording();
-    } else if (status === 'speaking' || status === 'greeting') {
-        stopSpeaking();
-    }
-  };
-
-  if (!hasSelectedLanguage) {
+  // Language selector screen
+  if (!selectedLanguage) {
     return (
-        <div style={styles.container}>
-            <div style={styles.exitButtonContainer}>
-                <button 
-                    onClick={onSwitchToChat}
-                    style={styles.exitButton}
-                >
-                    <X size={24} />
-                    <span>Exit Voice Mode</span>
-                </button>
-            </div>
-            <LanguageSelector onSelect={(lang) => {
-                setLanguage(lang);
-                setHasSelectedLanguage(true);
-                // Play greeting after language selection
-                playGreeting(lang);
-            }} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={styles.container}
+      >
+        <div style={styles.header}>
+          <div style={styles.titleWrapper}>
+            <span style={styles.title}>Voice Mode</span>
+          </div>
+          <button onClick={onClose} style={styles.closeButton}>
+            <X size={20} />
+          </button>
         </div>
+        <LanguageSelector onSelect={handleLanguageSelect} />
+      </motion.div>
     );
   }
 
+  const getStatusText = () => {
+    switch (status) {
+      case 'listening': return 'Listening...';
+      case 'processing': return 'Processing...';
+      case 'speaking': return 'Speaking...';
+      default: return 'Connecting...';
+    }
+  };
+
+  const displayTranscript = currentSpeaker === 'user' ? userTranscript : aiTranscript;
+  const words = displayTranscript.split(' ').filter(w => w.length > 0);
+
   return (
-    <div style={styles.container}>
-      {/* Background Ambient Glow */}
-      <div style={styles.backgroundGlow} />
-
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={styles.container}
+    >
       {/* Header */}
-      <div style={styles.exitButtonContainer}>
-          <button 
-              onClick={onSwitchToChat}
-              style={styles.exitButton}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
-          >
-              <X size={24} />
-              <span>Exit</span>
-          </button>
+      <div style={styles.header}>
+        <div style={styles.titleWrapper}>
+          <span style={styles.title}>Voice Mode</span>
+          <div style={styles.statusDot} />
+        </div>
+        <button onClick={onClose} style={styles.closeButton}>
+          <X size={20} />
+        </button>
       </div>
 
-      <div style={styles.languageBadgeContainer}>
-          <span style={styles.languageBadge}>
-              {language === 'en-IN' ? 'English' : 'தமிழ்'}
-          </span>
-      </div>
+
 
       {/* Time Slot Buttons */}
       <AnimatePresence>
@@ -708,63 +741,24 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
+      {/* Orb */}
       <main style={styles.mainContent}>
-        <div 
-            onClick={toggleRecording}
-            style={styles.orbContainer}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        <div
+          style={styles.orbContainer}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
-            <AnimatedOrb 
-                state={status} 
-                analyser={analyserRef.current} 
-            />
+          <AnimatedOrb
+            state={status}
+            analyser={analyserRef.current}
+          />
         </div>
-
-        <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={styles.statusTextContainer}
-        >
-            <p style={styles.statusText}>
-                {status === 'idle' && 'Ready to listen'}
-                {status === 'greeting' && 'Welcome...'}
-                {status === 'recording' && 'Listening...'}
-                {status === 'processing' && 'Thinking...'}
-                {status === 'speaking' && 'Speaking... Tap to interrupt'}
-            </p>
-        </motion.div>
-
-        {/* Transcript Display */}
-        {(userTranscript || aiTranscript) && (
-          <div style={styles.transcriptContainer}>
-            <p style={styles.speakerLabel}>
-              {currentSpeaker === 'user' ? 'You said:' : 'Assistant:'}
-            </p>
-            <motion.div
-              key={`${currentSpeaker}-${userTranscript || aiTranscript}`}
-              variants={containerVariants}
-              initial="hidden"
-              animate={isAnimating ? "visible" : "hidden"}
-              style={styles.transcriptText}
-            >
-              {(currentSpeaker === 'user' ? userTranscript : aiTranscript)
-                .split(' ')
-                .filter(word => word.length > 0)
-                .map((word, index) => (
-                  <motion.span
-                    key={index}
-                    variants={wordVariants}
-                    style={styles.transcriptWord}
-                  >
-                    {word}
-                  </motion.span>
-                ))}
-            </motion.div>
-          </div>
-        )}
       </main>
-    </div>
+
+      {/* Status */}
+      <div style={styles.statusText}>
+        {getStatusText()}
+      </div>
+    </motion.div>
   );
 }
