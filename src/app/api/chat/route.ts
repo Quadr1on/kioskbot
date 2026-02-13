@@ -548,8 +548,65 @@ If you do not have ALL 5 pieces of information, DO NOT call this tool. Instead, 
                 toolCalls: result.toolCalls,
                 toolResults: result.toolResults,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('DEBUG: generateText error:', error);
+
+            // If tool calling failed (Groq model regression), try to extract the intended response
+            // from the failed_generation field in the error body
+            const isToolError = error?.responseBody?.includes?.('tool_use_failed') ||
+                error?.responseBody?.includes?.('tool_call_validation') ||
+                error?.message?.includes?.('Tool call validation failed') ||
+                error?.message?.includes?.('Failed to call a function');
+
+            if (isToolError && error?.responseBody) {
+                console.log('DEBUG: Tool call failed, extracting text from failed_generation...');
+                try {
+                    const errorBody = JSON.parse(error.responseBody);
+                    const failedGen = errorBody?.error?.failed_generation || '';
+
+                    // Try to extract meaningful text from the failed generation
+                    // Pattern 1: {"name": "bookAppointment", "arguments": {"patientName": "...", ...}}
+                    // The model wanted to respond conversationally but wrapped it wrong
+                    // Pattern 2: {"name": "assistant<|channel|>final", "arguments": Thank you, ...}
+                    // The actual response text is after "arguments":
+                    let extractedText = '';
+
+                    // Try to find plain text in arguments (Pattern 2: broken JSON with plain text)
+                    const argsMatch = failedGen.match(/"arguments"\s*:\s*([^{}"].+?)}\s*$/);
+                    if (argsMatch) {
+                        extractedText = argsMatch[1].trim();
+                    }
+
+                    // Try Pattern 1: valid JSON where the model put conversational text as a field value
+                    if (!extractedText) {
+                        try {
+                            const parsed = JSON.parse(failedGen);
+                            if (parsed.arguments) {
+                                // Check if any argument value looks like a conversational response
+                                const values = Object.values(parsed.arguments) as string[];
+                                const conversational = values.find((v: string) =>
+                                    typeof v === 'string' && v.length > 20 && v.includes('?')
+                                );
+                                if (conversational) {
+                                    extractedText = conversational;
+                                }
+                            }
+                        } catch { /* not valid JSON */ }
+                    }
+
+                    if (extractedText) {
+                        console.log('DEBUG: Extracted text from failed generation:', extractedText);
+                        return NextResponse.json({
+                            text: extractedText,
+                            toolCalls: [],
+                            toolResults: [],
+                        });
+                    }
+                } catch (parseError) {
+                    console.error('DEBUG: Failed to parse error body:', parseError);
+                }
+            }
+
             return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
         }
     }

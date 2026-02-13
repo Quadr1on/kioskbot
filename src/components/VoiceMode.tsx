@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Clock } from 'lucide-react';
 import AnimatedOrb from './AnimatedOrb';
 import LanguageSelector from './LanguageSelector';
 import { getPreloadedGreeting, areGreetingsLoaded, preloadGreetings, GREETINGS } from '@/lib/greetingCache';
@@ -23,6 +23,10 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
   const [aiTranscript, setAiTranscript] = useState<string>('');
   const [currentSpeaker, setCurrentSpeaker] = useState<'user' | 'ai' | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // Time slot buttons state
+  const [timeSlots, setTimeSlots] = useState<{ id: number; time: string }[]>([]);
+  const [showTimeSlots, setShowTimeSlots] = useState(false);
   
   // Use a ref to track conversation history reliably (avoids React state update race conditions)
   const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
@@ -151,6 +155,49 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       textTransform: 'uppercase' as const,
       letterSpacing: '0.1em',
       marginBottom: '8px',
+    },
+    // Time slot button styles
+    timeSlotsOverlay: {
+      position: 'absolute' as const,
+      right: '24px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: 20,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      alignItems: 'flex-end',
+      gap: '8px',
+      maxHeight: '70vh',
+      overflowY: 'auto' as const,
+      paddingRight: '4px',
+    },
+    timeSlotsTitle: {
+      color: '#9ca3af',
+      fontSize: '12px',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.1em',
+      marginBottom: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+    },
+    timeSlotButton: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '10px 20px',
+      background: 'rgba(30, 64, 175, 0.25)',
+      backdropFilter: 'blur(12px)',
+      border: '1px solid rgba(99, 130, 255, 0.3)',
+      borderRadius: '9999px',
+      color: '#c7d2fe',
+      fontSize: '14px',
+      fontWeight: 500,
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      whiteSpace: 'nowrap' as const,
+      minWidth: '160px',
+      justifyContent: 'center',
     },
   };
 
@@ -348,14 +395,34 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       const fullResponse = data.text || '';
 
       console.log('DEBUG: VoiceMode received response:', fullResponse);
-      
+      console.log('DEBUG: VoiceMode toolResults:', data.toolResults);
+
+      // Check if the response contains time slot data from getDoctorTimeSlots
+      let detectedSlots: { id: number; time: string }[] = [];
+      if (data.toolResults && Array.isArray(data.toolResults)) {
+        for (const result of data.toolResults) {
+          if (result && result.availableSlots && Array.isArray(result.availableSlots)) {
+            detectedSlots = result.availableSlots;
+            break;
+          }
+        }
+      }
+
+      if (detectedSlots.length > 0) {
+        // Show time slot buttons instead of reading them all out
+        setTimeSlots(detectedSlots);
+        setShowTimeSlots(true);
+        console.log('DEBUG: Detected time slots, showing buttons:', detectedSlots);
+      }
+
       // Update both ref and state with the assistant's response
       const updatedHistory = [...newHistory, { role: 'assistant', content: fullResponse }];
       conversationHistoryRef.current = updatedHistory;
       setConversationHistory(updatedHistory);
 
       if (fullResponse && fullResponse.trim().length > 0) {
-        await playTTS(fullResponse);
+        // If time slots are shown, don't auto-restart recording — wait for button tap
+        await playTTS(fullResponse, detectedSlots.length === 0);
       } else {
         console.log('DEBUG: No text response from LLM');
         setStatus('idle');
@@ -378,6 +445,27 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
       setStatus('speaking');
       await playTTS(errorMessage, true);
     }
+  };
+
+  // Handle time slot button selection
+  const handleTimeSlotSelect = (slot: { id: number; time: string }) => {
+    // Hide the buttons
+    setShowTimeSlots(false);
+    setTimeSlots([]);
+
+    // Stop any ongoing TTS
+    stopSpeaking();
+
+    // Send the selection as a user message
+    const selectionText = `I'll take the ${slot.time} slot`;
+    setCurrentSpeaker('user');
+    setUserTranscript(selectionText);
+    setAiTranscript('');
+    setIsAnimating(true);
+    setStatus('processing');
+
+    // Feed it into the conversation
+    handleTranscript(selectionText);
   };
 
   const playTTS = async (text: string, autoRestartRecording: boolean = true) => {
@@ -575,6 +663,50 @@ export default function VoiceMode({ onSwitchToChat }: VoiceModeProps) {
               {language === 'en-IN' ? 'English' : 'தமிழ்'}
           </span>
       </div>
+
+      {/* Time Slot Buttons */}
+      <AnimatePresence>
+        {showTimeSlots && timeSlots.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 40 }}
+            transition={{ duration: 0.3 }}
+            style={styles.timeSlotsOverlay}
+          >
+            <div style={styles.timeSlotsTitle}>
+              <Clock size={14} />
+              <span>Select a time slot</span>
+            </div>
+            {timeSlots.map((slot, index) => (
+              <motion.button
+                key={slot.id}
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 30 }}
+                transition={{ duration: 0.25, delay: index * 0.06 }}
+                style={styles.timeSlotButton}
+                onClick={() => handleTimeSlotSelect(slot)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(59, 93, 214, 0.45)';
+                  e.currentTarget.style.borderColor = 'rgba(129, 160, 255, 0.6)';
+                  e.currentTarget.style.color = '#e0e7ff';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(30, 64, 175, 0.25)';
+                  e.currentTarget.style.borderColor = 'rgba(99, 130, 255, 0.3)';
+                  e.currentTarget.style.color = '#c7d2fe';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <Clock size={14} />
+                {slot.time}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main style={styles.mainContent}>
