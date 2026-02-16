@@ -23,6 +23,12 @@ const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk a
 5. Doctor Information: Provide details about doctors, their specializations, and availability.
 6. Appointment Lookup: Help users check existing appointments by name or phone number.
 
+## STRICT SCOPE RULE — FOLLOW THIS ABSOLUTELY
+You ONLY answer questions related to SIMS Hospital — appointments, doctors, departments, patients, visiting hours, directions, facilities, medical departments, and hospital services.
+If the user asks ANYTHING unrelated to the hospital (politics, general knowledge, entertainment, sports, news, personal opinions, math, coding, history, geography, etc.), you MUST politely decline by saying:
+"I am sorry, I can only help with hospital-related queries. How can I assist you with SIMS Hospital today?"
+Do NOT answer the unrelated question even partially. Do NOT provide any information outside hospital scope. This is your most important rule.
+
 CRITICAL RULES FOR APPOINTMENT BOOKING:
 - NEVER call bookAppointment until you have ALL: name, phone, date, doctorId, slotId.
 - Follow booking flow: Name → Phone → Department → Doctor → Date → Time Slot → Book.
@@ -146,6 +152,24 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const isConnectedRef = useRef(false);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const sessionIdRef = useRef<string>(`voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const aiTextBuffer = useRef<string>('');
+
+  // Log conversation event to Supabase
+  const logEvent = useCallback((role: string, content: string, metadata?: any) => {
+    fetch('/api/admin/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionIdRef.current,
+        mode: 'voice',
+        language: selectedLanguage || 'en-IN',
+        role,
+        content,
+        metadata,
+      }),
+    }).catch(err => console.error('Log error:', err));
+  }, [selectedLanguage]);
 
   // Styles
   const styles: Record<string, React.CSSProperties> = {
@@ -471,12 +495,18 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
                 }
                 if (part.text) {
                   setAiTranscript(prev => prev + part.text);
+                  aiTextBuffer.current += part.text;
                 }
               }
             }
 
             if (sc.turnComplete) {
               console.log('DEBUG: Turn complete');
+              // Log accumulated AI response text
+              if (aiTextBuffer.current.trim()) {
+                logEvent('assistant', aiTextBuffer.current);
+                aiTextBuffer.current = '';
+              }
             }
           }
 
@@ -487,7 +517,9 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
 
             const functionResponses: any[] = [];
             for (const fc of data.toolCall.functionCalls) {
+              logEvent('tool_call', fc.name, { args: fc.args || {} });
               const result = await executeTool(fc.name, fc.args || {});
+              logEvent('tool_result', fc.name, { result });
               functionResponses.push({
                 name: fc.name,
                 id: fc.id,
