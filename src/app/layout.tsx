@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Slab } from "next/font/google";
+import { Inter } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { KioskProvider } from "@/lib/kioskStore";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,14 +9,9 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const roboSlab = Roboto_Slab({
-  subsets: ['latin'],
-  variable: '--font-roboto-slab',
-});
-
 export const metadata: Metadata = {
-  title: "SIMS Hospital Assistant",
-  description: "Hospital kiosk assistant for patient services - Find patients, book appointments, and get hospital information",
+  title: "SIMS Hospital — AI Assistant Kiosk",
+  description: "SIMS Hospital interactive kiosk — Book appointments, find doctors, access emergency services, and more.",
 };
 
 export const viewport = {
@@ -30,11 +27,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${inter.variable} ${roboSlab.variable} antialiased`}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} antialiased`}>
+        <ThemeProvider>
+          <KioskProvider>
+            {children}
+          </KioskProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -3,6 +3,9 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MessageBubble from './MessageBubble';
+import VirtualKeyboard from './VirtualKeyboard';
+import MicOrb from './MicOrb';
+import { useTheme } from './ThemeProvider';
 
 interface Message {
   id: string;
@@ -11,44 +14,186 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  onSwitchToVoice?: () => void;
+  onBackToHome?: () => void;
+  initialMessage?: string;
+}
+
+/* ════════════════════════════════════════════════════
+   Outlined SVG Icons
+   ════════════════════════════════════════════════════ */
+
+function BackArrowIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
+
+function KeyboardIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="20" height="16" x="2" y="4" rx="2" ry="2" />
+      <path d="M6 8h.01" /><path d="M10 8h.01" /><path d="M14 8h.01" /><path d="M18 8h.01" />
+      <path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" />
+      <path d="M7 16h10" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m5 12 14-7-7 14v-7z" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" /><path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" /><path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  );
+}
+
+/* ── Quick Action Chip Icons (outlined stencil style) ─── */
+
+function CalendarOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+      <line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" />
+      <line x1="3" x2="21" y1="10" y2="10" />
+    </svg>
+  );
+}
+
+function SearchOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function ClockOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function UserOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+/* ── Department Chip Icons (outlined) ─── */
+
+function HeartOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    </svg>
+  );
+}
+
+function BrainOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
+      <path d="M12 5v9" />
+    </svg>
+  );
+}
+
+function BoneOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5c.28 0 .5.22.5.5a2.5 2.5 0 1 0 5 0c0-.81-.7-1.8 0-2.5Z" />
+    </svg>
+  );
+}
+
+function StethOutline() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+      <path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4" />
+      <circle cx="20" cy="10" r="2" />
+    </svg>
+  );
 }
 
 const QUICK_ACTIONS = [
-  { label: '📅 Book Appointment', message: 'I want to book an appointment' },
-  { label: '🔍 Find Patient', message: 'Find a patient by name' },
-  { label: '🏥 Visiting Hours', message: 'What are the visiting hours?' },
+  { label: 'Book Appointment', icon: <CalendarOutline />, message: 'I want to book an appointment' },
+  { label: 'Find Patient', icon: <SearchOutline />, message: 'Find a patient by name' },
+  { label: 'Visiting Hours', icon: <ClockOutline />, message: 'What are the visiting hours?' },
+  { label: 'Find Doctor', icon: <UserOutline />, message: 'I want to find a doctor' },
 ];
 
-const APPOINTMENT_ACTIONS = {
-  departments: [
-    { label: '❤️ Cardiology', message: 'Cardiology' },
-    { label: '🧠 Neurology', message: 'Neurology' },
-    { label: '🦴 Orthopedics', message: 'Orthopedics' },
-    { label: '⚕️ General Medicine', message: 'General Medicine' },
-  ],
-};
+const DEPARTMENT_ACTIONS = [
+  { label: 'Cardiology', icon: <HeartOutline />, message: 'Cardiology' },
+  { label: 'Neurology', icon: <BrainOutline />, message: 'Neurology' },
+  { label: 'Orthopedics', icon: <BoneOutline />, message: 'Orthopedics' },
+  { label: 'General Medicine', icon: <StethOutline />, message: 'General Medicine' },
+];
 
-export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
+/* ════════════════════════════════════════════════════
+   ChatInterface Component
+   ════════════════════════════════════════════════════ */
+
+export default function ChatInterface({ onBackToHome, initialMessage }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [language, setLanguage] = useState<'en-IN' | 'ta-IN'>('en-IN');
   const [isLoading, setIsLoading] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const initialSentRef = useRef(false);
+  const { isDark, toggleTheme } = useTheme();
 
-  const isInAppointmentFlow = messages.some(m => 
+  // Detect appointment flow for contextual chips
+  const isInAppointmentFlow = messages.some(m =>
     m.content.toLowerCase().includes('book an appointment') ||
     m.content.toLowerCase().includes('which department')
   );
 
+  const currentChips = isInAppointmentFlow ? DEPARTMENT_ACTIONS : QUICK_ACTIONS;
+
+  // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle initial message from parent
+  useEffect(() => {
+    if (initialMessage && !initialSentRef.current) {
+      initialSentRef.current = true;
+      setTimeout(() => sendMessage(initialMessage), 400);
+    }
+  }, [initialMessage]);
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
@@ -68,9 +213,9 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          language 
+          language,
         }),
       });
 
@@ -91,7 +236,6 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       while (reader) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         assistantContent += chunk;
         setMessages([...newMessages, { ...assistantMessage, content: assistantContent }]);
@@ -101,9 +245,7 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       setMessages([...newMessages, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: language === 'ta-IN' 
-          ? 'மன்னிக்கவும், பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.'
-          : 'Sorry, I encountered an error. Please try again.',
+        content: 'Sorry, I encountered an error. Please try again.',
       }]);
     } finally {
       setIsLoading(false);
@@ -115,51 +257,16 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
     sendMessage(inputValue);
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-        
-        const formData = new FormData();
-        formData.append('audio', audioBlob);
-        formData.append('language', language);
-
-        try {
-          const res = await fetch('/api/voice/stt', { method: 'POST', body: formData });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.transcript) {
-              setInputValue(data.transcript);
-            }
-          }
-        } catch (err) {
-          console.error('STT error:', err);
-        }
-        setIsRecording(false);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      console.error('Microphone error:', err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-  };
+  /* ─── Theme-aware colors ────────────────────────── */
+  const bgPrimary = isDark ? '#0a0a12' : '#f0f4ff';
+  const bgCard = isDark ? '#1a1a2e' : '#ffffff';
+  const bgInput = isDark ? '#1e1e36' : '#f5f7fb';
+  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,102,204,0.12)';
+  const textPri = isDark ? '#ffffff' : '#1a1a2e';
+  const textSec = isDark ? '#9ca3af' : '#6b7280';
+  const textTert = isDark ? '#6b7280' : '#9ca3af';
+  const simsBlue = '#0066CC';
+  const greenDot = '#22c55e';
 
   return (
     <div style={{
@@ -167,504 +274,329 @@ export default function ChatInterface({ onSwitchToVoice }: ChatInterfaceProps) {
       flexDirection: 'column',
       height: '100vh',
       width: '100%',
-      backgroundColor: '#121212',
-      fontFamily: '"Segoe UI", "Helvetica Neue", sans-serif',
+      background: bgPrimary,
+      fontFamily: '"Inter", "SF Pro Display", "Segoe UI", sans-serif',
       overflow: 'hidden',
+      transition: 'background 0.3s ease',
     }}>
-      <style>{`
-        * {
-          scrollbar-width: thin;
-          scrollbar-color: #3a3a3a transparent;
-        }
-        *::-webkit-scrollbar {
-          width: 6px;
-        }
-        *::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        *::-webkit-scrollbar-thumb {
-          background: #3a3a3a;
-          border-radius: 3px;
-        }
-        *::-webkit-scrollbar-thumb:hover {
-          background: #4a4a4a;
-        }
-        input::placeholder {
-          color: #6b7280;
-          font-weight: 400;
-        }
-      `}</style>
 
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        flex: 1,
-        width: '100%',
-        padding: '0',
-        minHeight: 0,
-        overflow: 'hidden',
-      }}>
-        <div style={{
+      {/* ════════ HEADER ════════════════════════════════ */}
+      <motion.div
+        style={{
           display: 'flex',
-          flexDirection: 'column',
-          width: '100%',
-          maxWidth: '900px',
-          height: '100%',
-          backgroundColor: '#1a1a1a',
-          borderRadius: '0',
-          overflow: 'hidden',
-        }}>
-          {/* Header */}
-          <motion.header initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 24px',
-            borderBottom: '1px solid #2a2a2a',
-            backgroundColor: '#1a1a1a',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              {/* Hospital Logo */}
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 100 }}
-                style={{
-                  width: '44px',
-                  height: '44px',
-                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                }}
-              >
-                <img src="/sims-logo.jpg" alt="" />
-              </motion.div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <h1 style={{
-                  fontSize: '18px',
-                  fontWeight: 800,
-                  color: 'white',
-                  margin: 0,
-                  letterSpacing: '-0.5px',
-                }}>SIMS Healthcare</h1>
-                <p style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: '#60a5fa',
-                  margin: 0,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}>AI Assistant</p>
-              </div>
-            </div>
-            
-            <div style={{ position: 'relative' }}>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowMenu(!showMenu)}
-                style={{
-                  padding: '8px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#9ca3af',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#2a2a2a';
-                  e.currentTarget.style.color = 'white';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#9ca3af';
-                }}
-              >
-                <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="2"/>
-                  <circle cx="12" cy="12" r="2"/>
-                  <circle cx="12" cy="19" r="2"/>
-                </svg>
-              </motion.button>
+          alignItems: 'center',
+          gap: 12,
+          padding: '14px 24px',
+          borderBottom: `1px solid ${border}`,
+          background: isDark ? 'rgba(26,26,46,0.8)' : 'rgba(255,255,255,0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 10,
+        }}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        {/* Back button */}
+        {onBackToHome && (
+          <motion.button
+            onClick={onBackToHome}
+            style={{
+              width: 40, height: 40,
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              color: textSec,
+              border: 'none', cursor: 'pointer',
+            }}
+            whileHover={{ scale: 1.08, background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <BackArrowIcon />
+          </motion.button>
+        )}
 
-              <AnimatePresence>
-                {showMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.92, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.92, y: -10 }}
-                    transition={{ duration: 0.15 }}
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: '48px',
-                      width: '200px',
-                      backgroundColor: '#212121',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-                      zIndex: 50,
-                      border: '1px solid #2a2a2a',
-                    }}
-                  >
-                    <div style={{ padding: '8px 0' }}>
-                      <p style={{ padding: '8px 16px', fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Language</p>
-                      <motion.button
-                        whileHover={{ background: '#2a2a2a' }}
-                        onClick={() => { setLanguage('en-IN'); setShowMenu(false); }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          textAlign: 'left',
-                          background: language === 'en-IN' ? '#374151' : 'transparent',
-                          border: 'none',
-                          color: 'white',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '14px',
-                          fontWeight: language === 'en-IN' ? 600 : 500,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        English
-                        {language === 'en-IN' && <span style={{ color: '#60a5fa', fontWeight: 700 }}>✓</span>}
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ background: '#2a2a2a' }}
-                        onClick={() => { setLanguage('ta-IN'); setShowMenu(false); }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          textAlign: 'left',
-                          background: language === 'ta-IN' ? '#374151' : 'transparent',
-                          border: 'none',
-                          color: 'white',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '14px',
-                          fontWeight: language === 'ta-IN' ? 600 : 500,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        தமிழ்
-                        {language === 'ta-IN' && <span style={{ color: '#60a5fa', fontWeight: 700 }}>✓</span>}
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.header>
-
-          {/* Messages Area */}
+        {/* Logo + Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
+            width: 38, height: 38,
+            borderRadius: 12,
+            background: simsBlue,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff',
           }}>
-            {messages.length === 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  textAlign: 'center',
-                }}
-              >
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  style={{
-                    width: '90px',
-                    height: '90px',
-                    background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                    borderRadius: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '28px',
-                    boxShadow: '0 15px 40px rgba(59, 130, 246, 0.25)',
-                    position: 'relative',
-                  }}
-                >
-                  <svg width="50" height="50" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="1.8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 7.5A2.5 2.5 0 016 5h12a2.5 2.5 0 012.5 2.5v9A2.5 2.5 0 0118 19H6a2.5 2.5 0 01-2.5-2.5v-9z" />
-                  </svg>
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    style={{
-                      position: 'absolute',
-                      inset: '-4px',
-                      border: '2px solid rgba(59, 130, 246, 0.3)',
-                      borderRadius: '20px',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                </motion.div>
-                <motion.h2 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 }}
-                  style={{
-                    fontSize: '32px',
-                    fontWeight: 800,
-                    background: 'linear-gradient(135deg, #ffffff 0%, #60a5fa 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    margin: '0 0 12px 0',
-                    letterSpacing: '-0.8px',
-                  }}
-                >
-                  {language === 'ta-IN' ? 'வணக்கம்!' : 'Welcome!'}
-                </motion.h2>
-                <motion.p 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  style={{
-                    fontSize: '17px',
-                    color: '#9ca3af',
-                    margin: 0,
-                    fontWeight: 600,
-                    lineHeight: '1.6',
-                  }}
-                >
-                  {language === 'ta-IN' 
-                    ? 'நிச்சய ஆரோக்கியத்துக்கு உங்கள் மருத்துவ உதவி'
-                    : 'Your AI-powered healthcare companion'}
-                </motion.p>
-                <motion.p 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.55 }}
-                  style={{
-                    fontSize: '14px',
-                    color: '#6b7280',
-                    margin: '8px 0 0 0',
-                    fontWeight: 500,
-                  }}
-                >
-                  {language === 'ta-IN' 
-                    ? 'நियமன பதிவு, நோயாளி தகவல், மற்றும் மேலும் பல'
-                    : 'Appointments, patient info, visiting hours & more'}
-                </motion.p>
-              </motion.div>
-            )}
-
-            <AnimatePresence>
-              {messages.map((message, index) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <MessageBubble
-                    role={message.role}
-                    content={message.content}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-
-            {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                <MessageBubble role="assistant" content="" isLoading />
-              </motion.div>
-            )}
-
-            <div ref={messagesEndRef} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+            </svg>
           </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: textPri, letterSpacing: '-0.3px' }}>
+              SIMS Assistant
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: greenDot }} />
+              <span style={{ fontSize: 11, fontWeight: 500, color: greenDot }}>Online</span>
+            </div>
+          </div>
+        </div>
 
-          {/* Quick Actions */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+        {/* Right side actions */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <motion.button
+            onClick={toggleTheme}
+            style={{
+              width: 38, height: 38,
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              color: textSec,
+              border: 'none', cursor: 'pointer',
+            }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* ════════ MESSAGES AREA ══════════════════════════ */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '24px 24px 12px',
+        scrollBehavior: 'smooth',
+      }}>
+        {/* Empty state — centered in viewport */}
+        {messages.length === 0 && (
+          <motion.div
             style={{
               display: 'flex',
-              gap: '8px',
-              padding: '12px 24px',
-              overflowX: 'auto',
-              borderTop: '1px solid #2a2a2a',
-              backgroundColor: '#1a1a1a',
-              flexWrap: 'wrap',
+              flexDirection: 'column',
+              alignItems: 'center',
               justifyContent: 'center',
+              minHeight: '60vh',
+              textAlign: 'center',
             }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
-            {(isInAppointmentFlow ? APPOINTMENT_ACTIONS.departments : QUICK_ACTIONS).map((action, index) => (
-              <motion.button
-                key={action.label}
+            <div style={{
+              width: 80, height: 80,
+              borderRadius: 24,
+              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,102,204,0.06)',
+              border: `1px solid ${border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 20,
+            }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={simsBlue} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+                <path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: 22, fontWeight: 700, color: textPri, margin: 0, letterSpacing: '-0.5px' }}>
+              How can I help?
+            </h3>
+            <p style={{ fontSize: 14, color: textTert, marginTop: 6 }}>
+              Ask me anything about SIMS Hospital
+            </p>
+          </motion.div>
+        )}
+
+        {/* Message bubbles — centered */}
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
+          ))}
+
+          {isLoading && <MessageBubble role="assistant" content="" isLoading />}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* ════════ BOTTOM BAR (Chips + Input + Keyboard) ═══ */}
+      <div style={{
+        borderTop: `1px solid ${border}`,
+        background: isDark ? 'rgba(26,26,46,0.6)' : 'rgba(255,255,255,0.7)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        padding: '12px 24px 16px',
+      }}>
+        {/* Center-constrained container */}
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+
+          {/* Choice Chips */}
+          <AnimatePresence mode="wait">
+            {!isLoading && (
+              <motion.div
+                key={isInAppointmentFlow ? 'dept' : 'quick'}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
+                  gap: 8,
+                  paddingBottom: 12,
+                }}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + index * 0.05 }}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => sendMessage(action.message)}
-                disabled={isLoading}
-                style={{
-                  padding: '10px 16px',
-                  backgroundColor: '#212121',
-                  border: '1px solid #3a3a3a',
-                  borderRadius: '24px',
-                  color: 'white',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                  opacity: isLoading ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isLoading) {
-                    e.currentTarget.style.borderColor = '#3B82F6';
-                    e.currentTarget.style.backgroundColor = '#2a2a2a';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.2)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#3a3a3a';
-                  e.currentTarget.style.backgroundColor = '#212121';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
               >
-                {action.label}
-              </motion.button>
-            ))}
-          </motion.div>
+                {currentChips.map((chip, i) => (
+                  <motion.button
+                    key={chip.label}
+                    onClick={() => sendMessage(chip.message)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      whiteSpace: 'nowrap',
+                      fontWeight: 500,
+                      fontSize: 13,
+                      background: isDark ? 'rgba(255,255,255,0.06)' : bgCard,
+                      border: `1.5px solid ${border}`,
+                      borderRadius: 100,
+                      color: textPri,
+                      padding: '9px 18px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    initial={{ opacity: 0, y: 12, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.9 }}
+                    transition={{ delay: i * 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ scale: 1.04, y: -2, borderColor: simsBlue }}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    <span style={{ color: simsBlue, display: 'flex', flexShrink: 0 }}>
+                      {chip.icon}
+                    </span>
+                    {chip.label}
+                  </motion.button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Input Area */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
+          {/* Input Bar */}
+          <form
+            onSubmit={handleSubmit}
             style={{
-              padding: '16px 24px 24px',
-              backgroundColor: '#1a1a1a',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
             }}
           >
-            <form onSubmit={handleSubmit}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: '#212121',
-                borderRadius: '28px',
-                padding: '10px 16px',
-                border: '1px solid #3a3a3a',
-                transition: 'all 0.2s',
+            {/* MicOrb */}
+            <MicOrb
+              onTranscript={(text) => {
+                setInputValue(text);
+                setTimeout(() => sendMessage(text), 200);
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3B82F6';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.15)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#3a3a3a';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
+              disabled={isLoading}
+              language={language}
+            />
+
+            {/* Input container */}
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              background: bgInput,
+              border: `1.5px solid ${border}`,
+              borderRadius: 100,
+              padding: '4px 6px 4px 20px',
+              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+            }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Type your message…"
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: 14,
+                  color: textPri,
+                  minHeight: 44,
+                  fontFamily: 'inherit',
+                }}
+                disabled={isLoading}
+              />
+
+              {/* Keyboard toggle */}
+              <motion.button
+                type="button"
+                onClick={() => setShowKeyboard(!showKeyboard)}
+                style={{
+                  width: 38, height: 38,
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: showKeyboard ? 'rgba(0,102,204,0.1)' : 'transparent',
+                  color: showKeyboard ? simsBlue : textTert,
+                  border: 'none', cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
               >
-                {/* Mic Button */}
-                <motion.button
-                  type="button"
-                  onMouseDown={startRecording}
-                  onMouseUp={stopRecording}
-                  onTouchStart={startRecording}
-                  onTouchEnd={stopRecording}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  style={{
-                    padding: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isRecording ? '#ef4444' : '#9ca3af',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={(e) => !isRecording && (e.currentTarget.style.color = '#3B82F6')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = isRecording ? '#ef4444' : '#9ca3af')}
-                >
-                  <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                  </svg>
-                </motion.button>
+                <KeyboardIcon />
+              </motion.button>
 
-                {/* Text Input */}
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={language === 'ta-IN' ? 'உங்கள் செய்தியை தட்டச்சு செய்யவும்...' : 'Type your message...'}
-                  style={{
-                    flex: 1,
-                    background: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    color: 'white',
-                    fontSize: '15px',
-                    padding: '10px 12px',
-                    fontFamily: 'inherit',
-                    fontWeight: 500,
+              {/* Send button */}
+              <motion.button
+                type="submit"
+                disabled={!inputValue.trim() || isLoading}
+                style={{
+                  width: 38, height: 38,
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: inputValue.trim() ? simsBlue : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+                  color: inputValue.trim() ? '#fff' : textTert,
+                  border: 'none', cursor: 'pointer',
+                  opacity: !inputValue.trim() || isLoading ? 0.5 : 1,
+                  transition: 'all 0.2s ease',
+                }}
+                whileHover={inputValue.trim() ? { scale: 1.1 } : undefined}
+                whileTap={inputValue.trim() ? { scale: 0.9 } : undefined}
+              >
+                <SendIcon />
+              </motion.button>
+            </div>
+          </form>
+
+          {/* Virtual Keyboard */}
+          <AnimatePresence>
+            {showKeyboard && (
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 40 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                style={{ marginTop: 12 }}
+              >
+                <VirtualKeyboard
+                  onKeyPress={(key: string) => {
+                    if (key === 'BACKSPACE') {
+                      setInputValue(prev => prev.slice(0, -1));
+                    } else if (key === 'ENTER') {
+                      sendMessage(inputValue);
+                    } else if (key === 'SPACE') {
+                      setInputValue(prev => prev + ' ');
+                    } else {
+                      setInputValue(prev => prev + key);
+                    }
                   }}
-                  disabled={isLoading}
+                  onClose={() => setShowKeyboard(false)}
                 />
-
-                {/* Send Button */}
-                <motion.button
-                  type="submit"
-                  disabled={!inputValue.trim() || isLoading}
-                  whileHover={!(!inputValue.trim() || isLoading) ? { scale: 1.1 } : {}}
-                  whileTap={!(!inputValue.trim() || isLoading) ? { scale: 0.95 } : {}}
-                  style={{
-                    padding: '10px',
-                    background: !inputValue.trim() || isLoading ? '#3a3a3a' : 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    cursor: (!inputValue.trim() || isLoading) ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s',
-                    boxShadow: (!inputValue.trim() || isLoading) ? 'none' : '0 4px 12px rgba(59, 130, 246, 0.4)',
-                  }}
-                >
-                  <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </motion.button>
-              </div>
-            </form>
-          </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

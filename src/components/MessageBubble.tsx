@@ -1,156 +1,228 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from './ThemeProvider';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
-  timestamp?: Date;
   isLoading?: boolean;
 }
 
-function parseContent(text: string) {
-  const lines = text.split('\n');
-  
-  return lines.map((line, lineIndex) => {
-    const isBullet = line.trim().match(/^[-*]\s+(.+)/);
-    
-    const parts = line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        const boldText = part.slice(2, -2);
-        return (
-          <strong key={`${lineIndex}-${partIndex}`} style={{ fontWeight: 700 }}>
-            {boldText}
-          </strong>
-        );
-      }
-      return part;
-    });
+/* ── Outlined feedback icons ── */
+function ThumbUpIcon({ filled }: { filled?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </svg>
+  );
+}
 
-    if (isBullet) {
-      const contentWithoutBullet = isBullet[1];
-      const bulletParts = contentWithoutBullet.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          const boldText = part.slice(2, -2);
-          return (
-            <strong key={`bullet-${lineIndex}-${partIndex}`} style={{ fontWeight: 700 }}>
-              {boldText}
-            </strong>
-          );
-        }
-        return part;
-      });
-
-      return (
-        <div key={lineIndex} style={{ 
-          display: 'flex', 
-          alignItems: 'flex-start', 
-          marginLeft: '8px', 
-          marginBottom: '6px',
-          fontSize: '15px',
-          lineHeight: '1.6',
-        }}>
-          <span style={{ marginRight: '10px', fontSize: '16px', lineHeight: '1.2', flexShrink: 0, marginTop: '2px' }}>•</span>
-          <span style={{ flex: 1 }}>{bulletParts}</span>
-        </div>
-      );
-    }
-
-    if (line.trim() === '') {
-      return <div key={lineIndex} style={{ height: '10px' }} />;
-    }
-
-    return (
-      <div key={lineIndex} style={{ 
-        marginBottom: '4px',
-        fontSize: '15px',
-        lineHeight: '1.6',
-        fontWeight: 500,
-      }}>
-        {parts}
-      </div>
-    );
-  });
+function ThumbDownIcon({ filled }: { filled?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />
+    </svg>
+  );
 }
 
 export default function MessageBubble({ role, content, isLoading }: MessageBubbleProps) {
   const isUser = role === 'user';
+  const { isDark } = useTheme();
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  // Auto-show feedback buttons after 1s (kiosk = touch, no hover)
+  useEffect(() => {
+    if (!isUser && content && !isLoading) {
+      const timer = setTimeout(() => setShowFeedback(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isUser, content, isLoading]);
+
+  /* ── Theme-aware colors ── */
+  const userBg = '#0066CC';
+  const assistantBg = isDark ? 'rgba(255,255,255,0.06)' : '#ffffff';
+  const assistantBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,102,204,0.08)';
+  const textColor = isUser ? '#ffffff' : (isDark ? '#f0f0f0' : '#1a1a2e');
+  const feedbackColor = isDark ? '#6b7280' : '#9ca3af';
+  const feedbackActiveUp = '#22c55e';
+  const feedbackActiveDown = '#ef4444';
+
+  if (isLoading) {
+    return (
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-start' }}>
+        <motion.div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '16px 24px',
+            background: assistantBg,
+            border: `1px solid ${assistantBorder}`,
+            borderRadius: '20px 20px 20px 4px',
+            backdropFilter: 'blur(12px)',
+          }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: '#0066CC',
+              }}
+              animate={{
+                y: [0, -8, 0],
+                opacity: [0.4, 1, 0.4],
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                delay: i * 0.15,
+                ease: 'easeInOut',
+              }}
+            />
+          ))}
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!content) return null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
       style={{
+        marginBottom: 16,
         display: 'flex',
-        justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: '16px',
+        flexDirection: 'column',
+        alignItems: isUser ? 'flex-end' : 'flex-start',
       }}
+      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => !isUser && setShowFeedback(true)}
+      onMouseLeave={() => !isUser && setShowFeedback(false)}
     >
+      {/* Message bubble */}
       <div
         style={{
-          maxWidth: '70%',
-          padding: isUser ? '10px 16px' : '12px 16px',
-          borderRadius: isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
-          background: isUser 
-            ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' 
-            : '#212121',
-          color: isUser ? 'white' : 'white',
-          wordBreak: 'break-word',
-          boxShadow: isUser 
-            ? '0 4px 12px rgba(59, 130, 246, 0.25)' 
-            : '0 2px 8px rgba(0, 0, 0, 0.2)',
-          border: isUser ? 'none' : '1px solid #3a3a3a',
-          transition: 'all 0.2s',
+          maxWidth: '80%',
+          whiteSpace: 'pre-wrap',
+          padding: '14px 20px',
+          fontSize: 17,
+          lineHeight: 1.65,
+          fontWeight: 400,
+          letterSpacing: '-0.1px',
+          color: textColor,
+          borderRadius: isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+          ...(isUser
+            ? {
+              background: userBg,
+              boxShadow: '0 4px 20px rgba(0,102,204,0.25)',
+            }
+            : {
+              background: assistantBg,
+              border: `1px solid ${assistantBorder}`,
+              backdropFilter: 'blur(12px)',
+              boxShadow: isDark ? 'none' : '0 2px 12px rgba(0,0,0,0.04)',
+            }),
         }}
       >
-        {isLoading ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 4px',
-          }}>
-            <motion.span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#9ca3af',
-              }}
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
-            />
-            <motion.span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#9ca3af',
-              }}
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-            />
-            <motion.span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#9ca3af',
-              }}
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-            />
-          </div>
-        ) : (
-          <div style={{
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}>
-            {parseContent(content)}
-          </div>
-        )}
+        {content}
       </div>
+
+      {/* Thumbs up / down feedback — only on assistant messages */}
+      {!isUser && (
+        <AnimatePresence>
+          {(showFeedback || feedback) && (
+            <motion.div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                marginTop: 6,
+                marginLeft: 8,
+              }}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.button
+                onClick={() => setFeedback(feedback === 'up' ? null : 'up')}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: feedback === 'up' ? 'rgba(34,197,94,0.12)' : 'transparent',
+                  color: feedback === 'up' ? feedbackActiveUp : feedbackColor,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.85 }}
+                aria-label="Good response"
+              >
+                <ThumbUpIcon filled={feedback === 'up'} />
+              </motion.button>
+
+              <motion.button
+                onClick={() => setFeedback(feedback === 'down' ? null : 'down')}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: feedback === 'down' ? 'rgba(239,68,68,0.12)' : 'transparent',
+                  color: feedback === 'down' ? feedbackActiveDown : feedbackColor,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.85 }}
+                aria-label="Bad response"
+              >
+                <ThumbDownIcon filled={feedback === 'down'} />
+              </motion.button>
+
+              {/* Thank you feedback */}
+              <AnimatePresence>
+                {feedback && (
+                  <motion.span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: feedback === 'up' ? feedbackActiveUp : feedbackActiveDown,
+                      marginLeft: 4,
+                    }}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {feedback === 'up' ? 'Thanks!' : 'We\'ll improve'}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </motion.div>
   );
 }

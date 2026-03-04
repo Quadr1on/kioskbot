@@ -13,7 +13,6 @@ interface VoiceModeProps {
 // Gemini Live API WebSocket URL
 const GEMINI_WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 
-// System prompt (same as chat route)
 const SYSTEM_PROMPT = `You are a friendly and helpful hospital assistant kiosk at SIMS Hospital in Chennai. You help patients and visitors with:
 
 1. Finding Patients: Help locate admitted patients by name and provide their room number and department.
@@ -168,7 +167,7 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
         content,
         metadata,
       }),
-    }).catch(err => console.error('Log error:', err));
+    }).catch((err: any) => console.error('Log error:', err));
   }, [selectedLanguage]);
 
   // Styles
@@ -304,15 +303,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
     },
   };
 
-  const wordVariants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: i * 0.05, duration: 0.3, ease: 'easeOut' },
-    }),
-  };
-
   // Execute tool call via server API
   const executeTool = useCallback(async (functionName: string, args: any) => {
     console.log('DEBUG: Executing tool:', functionName, args);
@@ -340,7 +330,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
 
   // ---- Audio Playback ----
 
-  // Decode base64 PCM (16-bit, 24kHz) to Float32Array
   const decodePCM = (base64: string): Float32Array => {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
@@ -355,7 +344,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
     return float32;
   };
 
-  // Play audio from queue
   const playAudioQueue = useCallback(async () => {
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
     isPlayingRef.current = true;
@@ -367,7 +355,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       const ctx = audioContextRef.current;
       if (!ctx || ctx.state === 'closed') break;
 
-      // Resume if suspended
       if (ctx.state === 'suspended') await ctx.resume();
 
       const audioBuffer = ctx.createBuffer(1, float32.length, 24000);
@@ -376,7 +363,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
 
-      // Route through analyser → gain → destination
       if (analyserRef.current && gainNodeRef.current) {
         source.connect(analyserRef.current);
         analyserRef.current.connect(gainNodeRef.current);
@@ -402,7 +388,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       setStatus('processing');
       console.log('DEBUG: Starting Gemini Live connection...');
 
-      // Get API key
       const keyRes = await fetch('/api/voice/gemini-token');
       const keyData = await keyRes.json();
       if (!keyData.apiKey) {
@@ -410,7 +395,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
         return;
       }
 
-      // Create audio context for playback at 24kHz
       const audioCtx = new AudioContext({ sampleRate: 24000 });
       audioContextRef.current = audioCtx;
 
@@ -422,7 +406,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       gainNode.gain.value = 1.0;
       gainNodeRef.current = gainNode;
 
-      // Connect WebSocket
       const wsUrl = `${GEMINI_WS_URL}?key=${keyData.apiKey}`;
       console.log('DEBUG: Connecting to WebSocket...');
       const ws = new WebSocket(wsUrl);
@@ -433,10 +416,9 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
         isConnectedRef.current = true;
 
         const languageInstruction = language === 'ta-IN'
-          ? '\nIMPORTANT: The user speaks Tamil. Respond in Tamil. Greet with "SIMS மருத்துவமனைக்கு வரவேற்கிறோம்!".'
+          ? '\nIMPORTANT: The user speaks Tamil. Respond in Tamil. Greet with a Tamil greeting.'
           : '\nGreet the user with "Welcome to SIMS Hospital! How can I help you today?"';
 
-        // Send BidiGenerateContentSetup
         const setupMessage = {
           setup: {
             model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
@@ -466,7 +448,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
 
           console.log('DEBUG: WS message:', Object.keys(data));
 
-          // Setup complete
           if (data.setupComplete) {
             console.log('DEBUG: Setup complete! Starting mic...');
             await startMicCapture();
@@ -474,7 +455,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
             return;
           }
 
-          // Server content (audio/text response)
           if (data.serverContent) {
             const sc = data.serverContent;
 
@@ -502,7 +482,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
 
             if (sc.turnComplete) {
               console.log('DEBUG: Turn complete');
-              // Log accumulated AI response text
               if (aiTextBuffer.current.trim()) {
                 logEvent('assistant', aiTextBuffer.current);
                 aiTextBuffer.current = '';
@@ -510,7 +489,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
             }
           }
 
-          // Tool call from Gemini
           if (data.toolCall) {
             console.log('DEBUG: Tool call:', data.toolCall);
             setStatus('processing');
@@ -527,7 +505,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
               });
             }
 
-            // Send tool response back
             const toolResponseMsg = {
               toolResponse: { functionResponses },
             };
@@ -554,7 +531,7 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       console.error('DEBUG: Connection error:', error);
       setStatus('idle');
     }
-  }, [executeTool, playAudioQueue]);
+  }, [executeTool, playAudioQueue, logEvent]);
 
   // ---- Microphone Capture ----
 
@@ -570,13 +547,9 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       });
       streamRef.current = stream;
 
-      // Create a separate AudioContext for mic capture at native rate
-      // We need the worklet to handle resampling to 16kHz
       const audioCtx = audioContextRef.current;
       if (!audioCtx) return;
 
-      // We use a ScriptProcessorNode for broader compatibility (AudioWorklet can have issues loading)
-      // Create a separate context for mic at native sample rate
       const micCtx = new AudioContext();
       const source = micCtx.createMediaStreamSource(stream);
 
@@ -588,7 +561,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
 
         const inputData = e.inputBuffer.getChannelData(0);
 
-        // Resample from micCtx.sampleRate to 16000
         const ratio = micCtx.sampleRate / 16000;
         const outputLength = Math.floor(inputData.length / ratio);
         const pcm16 = new Int16Array(outputLength);
@@ -599,7 +571,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
           pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
         }
 
-        // Convert to base64
         const bytes = new Uint8Array(pcm16.buffer);
         let binary = '';
         for (let i = 0; i < bytes.length; i++) {
@@ -607,7 +578,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
         }
         const base64 = btoa(binary);
 
-        // Send realtime input
         const realtimeMsg = {
           realtimeInput: {
             mediaChunks: [{
@@ -620,8 +590,8 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
       };
 
       source.connect(scriptNode);
-      scriptNode.connect(micCtx.destination); // Required to keep it alive
-      
+      scriptNode.connect(micCtx.destination);
+
       console.log('DEBUG: Mic capture started at', micCtx.sampleRate, 'Hz');
       setStatus('listening');
     } catch (error) {
@@ -664,7 +634,7 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
         wsRef.current = null;
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach((t: MediaStreamTrack) => t.stop());
         streamRef.current = null;
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -707,7 +677,7 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
   };
 
   const displayTranscript = currentSpeaker === 'user' ? userTranscript : aiTranscript;
-  const words = displayTranscript.split(' ').filter(w => w.length > 0);
+  const words = displayTranscript.split(' ').filter((w: string) => w.length > 0);
 
   return (
     <motion.div
@@ -726,8 +696,6 @@ export default function VoiceMode({ onClose }: VoiceModeProps) {
           <X size={20} />
         </button>
       </div>
-
-
 
       {/* Time Slot Buttons */}
       <AnimatePresence>
