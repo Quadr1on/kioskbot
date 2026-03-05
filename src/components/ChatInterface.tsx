@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import MessageBubble from './MessageBubble';
 import VirtualKeyboard from './VirtualKeyboard';
 import MicOrb from './MicOrb';
+import AccessibilityPanel from './AccessibilityPanel';
 import { useTheme } from './ThemeProvider';
 
 interface Message {
@@ -145,11 +146,33 @@ function StethOutline() {
   );
 }
 
+function EmergencyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 9v4" /><path d="M12 17h.01" />
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    </svg>
+  );
+}
+
+function PersonnelIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 const QUICK_ACTIONS = [
   { label: 'Book Appointment', icon: <CalendarOutline />, message: 'I want to book an appointment' },
   { label: 'Find Patient', icon: <SearchOutline />, message: 'Find a patient by name' },
   { label: 'Visiting Hours', icon: <ClockOutline />, message: 'What are the visiting hours?' },
   { label: 'Find Doctor', icon: <UserOutline />, message: 'I want to find a doctor' },
+  { label: 'Emergency', icon: <EmergencyIcon />, message: 'I have a medical emergency. What should I do?' },
+  { label: 'Call Personnel', icon: <PersonnelIcon />, message: '__PERSONNEL_ALERT__' },
 ];
 
 const DEPARTMENT_ACTIONS = [
@@ -169,6 +192,8 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
   const [language, setLanguage] = useState<'en-IN' | 'ta-IN'>('en-IN');
   const [isLoading, setIsLoading] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
+  const [showAccessibility, setShowAccessibility] = useState(false);
+  const [personnelAlert, setPersonnelAlert] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialSentRef = useRef(false);
@@ -257,22 +282,28 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
     sendMessage(inputValue);
   };
 
-  /* ─── Theme-aware colors ────────────────────────── */
-  const bgPrimary = isDark ? '#0a0a12' : '#f0f4ff';
-  const bgCard = isDark ? '#1a1a2e' : '#ffffff';
-  const bgInput = isDark ? '#1e1e36' : '#f5f7fb';
-  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,102,204,0.12)';
-  const textPri = isDark ? '#ffffff' : '#1a1a2e';
-  const textSec = isDark ? '#9ca3af' : '#6b7280';
-  const textTert = isDark ? '#6b7280' : '#9ca3af';
-  const simsBlue = '#0066CC';
-  const greenDot = '#22c55e';
+  /* ─── Theme-aware colors — ALL from CSS vars for accessibility ─── */
+  const bgPrimary = 'var(--bg-primary)';
+  const bgCard = 'var(--bg-secondary)';
+  const bgInput = 'var(--bg-tertiary)';
+  const border = 'var(--border-light)';
+  const textPri = 'var(--text-primary)';
+  const textSec = 'var(--text-secondary)';
+  const textTert = 'var(--text-tertiary)';
+  const simsBlue = 'var(--sims-blue)';
+  const greenDot = 'var(--accent-green)';
+
+  // Personnel alert handler
+  const handlePersonnelAlert = useCallback(() => {
+    setPersonnelAlert(true);
+    setTimeout(() => setPersonnelAlert(false), 5000);
+  }, []);
 
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
+      height: '100dvh',
       width: '100%',
       background: bgPrimary,
       fontFamily: '"Inter", "SF Pro Display", "Segoe UI", sans-serif',
@@ -286,12 +317,13 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          padding: '14px 24px',
+          padding: '12px 16px',
           borderBottom: `1px solid ${border}`,
-          background: isDark ? 'rgba(26,26,46,0.8)' : 'rgba(255,255,255,0.85)',
+          background: 'var(--bg-glass-strong)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           zIndex: 10,
+          flexShrink: 0,
         }}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -305,11 +337,11 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
               width: 40, height: 40,
               borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              background: 'var(--bg-tertiary)',
               color: textSec,
               border: 'none', cursor: 'pointer',
             }}
-            whileHover={{ scale: 1.08, background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }}
+            whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
           >
             <BackArrowIcon />
@@ -330,25 +362,25 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: textPri, letterSpacing: '-0.3px' }}>
+            <div style={{ fontSize: 'calc(15px * var(--text-scale, 1))', fontWeight: 700, color: textPri, letterSpacing: '-0.3px' }}>
               SIMS Assistant
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: greenDot }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: greenDot }}>Online</span>
+              <span style={{ fontSize: 'calc(11px * var(--text-scale, 1))', fontWeight: 500, color: greenDot }}>Online</span>
             </div>
           </div>
         </div>
 
         {/* Right side actions */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
           <motion.button
             onClick={toggleTheme}
             style={{
               width: 38, height: 38,
               borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              background: 'var(--bg-tertiary)',
               color: textSec,
               border: 'none', cursor: 'pointer',
             }}
@@ -357,6 +389,32 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
           >
             {isDark ? <SunIcon /> : <MoonIcon />}
           </motion.button>
+
+          {/* Accessibility button */}
+          <motion.button
+            onClick={() => setShowAccessibility(!showAccessibility)}
+            style={{
+              width: 38, height: 38,
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: showAccessibility ? 'var(--sims-blue-subtle)' : 'var(--bg-tertiary)',
+              color: showAccessibility ? simsBlue : textSec,
+              border: 'none', cursor: 'pointer',
+            }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" /><path d="M12 8h.01" />
+            </svg>
+          </motion.button>
+
+          {/* Accessibility Dropdown */}
+          <AccessibilityPanel
+            isOpen={showAccessibility}
+            onClose={() => setShowAccessibility(false)}
+          />
         </div>
       </motion.div>
 
@@ -364,7 +422,7 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '24px 24px 12px',
+        padding: '16px 12px 8px',
         scrollBehavior: 'smooth',
       }}>
         {/* Empty state — centered in viewport */}
@@ -385,7 +443,7 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
             <div style={{
               width: 80, height: 80,
               borderRadius: 24,
-              background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,102,204,0.06)',
+              background: 'var(--sims-blue-subtle)',
               border: `1px solid ${border}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: 20,
@@ -395,10 +453,10 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                 <path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" />
               </svg>
             </div>
-            <h3 style={{ fontSize: 22, fontWeight: 700, color: textPri, margin: 0, letterSpacing: '-0.5px' }}>
+            <h3 style={{ fontSize: 'calc(22px * var(--text-scale, 1))', fontWeight: 700, color: textPri, margin: 0, letterSpacing: '-0.5px' }}>
               How can I help?
             </h3>
-            <p style={{ fontSize: 14, color: textTert, marginTop: 6 }}>
+            <p style={{ fontSize: 'calc(14px * var(--text-scale, 1))', color: textTert, marginTop: 6 }}>
               Ask me anything about SIMS Hospital
             </p>
           </motion.div>
@@ -419,10 +477,11 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
       {/* ════════ BOTTOM BAR (Chips + Input + Keyboard) ═══ */}
       <div style={{
         borderTop: `1px solid ${border}`,
-        background: isDark ? 'rgba(26,26,46,0.6)' : 'rgba(255,255,255,0.7)',
+        background: 'var(--bg-glass)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        padding: '12px 24px 16px',
+        padding: '10px 12px 12px',
+        flexShrink: 0,
       }}>
         {/* Center-constrained container */}
         <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -444,38 +503,67 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentChips.map((chip, i) => (
-                  <motion.button
-                    key={chip.label}
-                    onClick={() => sendMessage(chip.message)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      whiteSpace: 'nowrap',
-                      fontWeight: 500,
-                      fontSize: 13,
-                      background: isDark ? 'rgba(255,255,255,0.06)' : bgCard,
-                      border: `1.5px solid ${border}`,
-                      borderRadius: 100,
-                      color: textPri,
-                      padding: '9px 18px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
-                    initial={{ opacity: 0, y: 12, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.9 }}
-                    transition={{ delay: i * 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ scale: 1.04, y: -2, borderColor: simsBlue }}
-                    whileTap={{ scale: 0.96 }}
-                  >
-                    <span style={{ color: simsBlue, display: 'flex', flexShrink: 0 }}>
-                      {chip.icon}
-                    </span>
-                    {chip.label}
-                  </motion.button>
-                ))}
+                {currentChips.map((chip, i) => {
+                  const isEmergency = chip.label === 'Emergency';
+                  const isPersonnel = chip.label === 'Call Personnel';
+                  return (
+                    <motion.button
+                      key={chip.label}
+                      onClick={() => {
+                        if (isPersonnel) { handlePersonnelAlert(); return; }
+                        sendMessage(chip.message);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        whiteSpace: 'nowrap',
+                        fontWeight: 500,
+                        fontSize: 'calc(13px * var(--text-scale, 1))',
+                        background: isEmergency ? 'var(--accent-red)' : isPersonnel ? 'var(--accent-purple)' : 'var(--bg-secondary)',
+                        border: `1.5px solid ${isEmergency || isPersonnel ? 'transparent' : border}`,
+                        borderRadius: 100,
+                        color: isEmergency || isPersonnel ? '#fff' : textPri,
+                        padding: '9px 18px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      initial={{ opacity: 0, y: 12, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.9 }}
+                      transition={{ delay: i * 0.05, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                      whileHover={{ scale: 1.04, y: -2 }}
+                      whileTap={{ scale: 0.96 }}
+                    >
+                      <span style={{ color: isEmergency || isPersonnel ? '#fff' : simsBlue, display: 'flex', flexShrink: 0 }}>
+                        {chip.icon}
+                      </span>
+                      {chip.label}
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Personnel Alert Banner */}
+          <AnimatePresence>
+            {personnelAlert && (
+              <motion.div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 18px', borderRadius: 14, marginBottom: 10,
+                  background: 'var(--accent-purple)',
+                  color: '#fff', fontSize: 14, fontWeight: 600,
+                }}
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Alerted nearby human assistant to help you
               </motion.div>
             )}
           </AnimatePresence>
@@ -504,7 +592,7 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
               flex: 1,
               display: 'flex',
               alignItems: 'center',
-              background: bgInput,
+              background: 'var(--bg-tertiary)',
               border: `1.5px solid ${border}`,
               borderRadius: 100,
               padding: '4px 6px 4px 20px',
@@ -521,7 +609,7 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  fontSize: 14,
+                  fontSize: 'calc(14px * var(--text-scale, 1))',
                   color: textPri,
                   minHeight: 44,
                   fontFamily: 'inherit',
@@ -537,7 +625,7 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                   width: 38, height: 38,
                   borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: showKeyboard ? 'rgba(0,102,204,0.1)' : 'transparent',
+                  background: showKeyboard ? 'var(--sims-blue-subtle)' : 'transparent',
                   color: showKeyboard ? simsBlue : textTert,
                   border: 'none', cursor: 'pointer',
                   transition: 'all 0.2s',
@@ -556,8 +644,8 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                   width: 38, height: 38,
                   borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: inputValue.trim() ? simsBlue : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
-                  color: inputValue.trim() ? '#fff' : textTert,
+                  background: inputValue.trim() ? simsBlue : 'var(--bg-tertiary)',
+                  color: inputValue.trim() ? 'var(--text-inverse)' : textTert,
                   border: 'none', cursor: 'pointer',
                   opacity: !inputValue.trim() || isLoading ? 0.5 : 1,
                   transition: 'all 0.2s ease',
@@ -581,17 +669,9 @@ export default function ChatInterface({ onBackToHome, initialMessage }: ChatInte
                 style={{ marginTop: 12 }}
               >
                 <VirtualKeyboard
-                  onKeyPress={(key: string) => {
-                    if (key === 'BACKSPACE') {
-                      setInputValue(prev => prev.slice(0, -1));
-                    } else if (key === 'ENTER') {
-                      sendMessage(inputValue);
-                    } else if (key === 'SPACE') {
-                      setInputValue(prev => prev + ' ');
-                    } else {
-                      setInputValue(prev => prev + key);
-                    }
-                  }}
+                  inputValue={inputValue}
+                  onInputChange={setInputValue}
+                  onSubmit={() => sendMessage(inputValue)}
                   onClose={() => setShowKeyboard(false)}
                 />
               </motion.div>

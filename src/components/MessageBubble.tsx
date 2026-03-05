@@ -43,14 +43,14 @@ export default function MessageBubble({ role, content, isLoading }: MessageBubbl
     }
   }, [isUser, content, isLoading]);
 
-  /* ── Theme-aware colors ── */
-  const userBg = '#0066CC';
-  const assistantBg = isDark ? 'rgba(255,255,255,0.06)' : '#ffffff';
-  const assistantBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,102,204,0.08)';
-  const textColor = isUser ? '#ffffff' : (isDark ? '#f0f0f0' : '#1a1a2e');
-  const feedbackColor = isDark ? '#6b7280' : '#9ca3af';
-  const feedbackActiveUp = '#22c55e';
-  const feedbackActiveDown = '#ef4444';
+  /* ── Theme-aware colors via CSS vars ── */
+  const userBg = 'var(--sims-blue)';
+  const assistantBg = 'var(--bg-secondary)';
+  const assistantBorder = 'var(--border-light)';
+  const textColor = isUser ? 'var(--text-inverse)' : 'var(--text-primary)';
+  const feedbackColor = 'var(--text-tertiary)';
+  const feedbackActiveUp = 'var(--accent-green)';
+  const feedbackActiveDown = 'var(--accent-red)';
 
   if (isLoading) {
     return (
@@ -77,7 +77,7 @@ export default function MessageBubble({ role, content, isLoading }: MessageBubbl
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: '#0066CC',
+                background: 'var(--sims-blue)',
               }}
               animate={{
                 y: [0, -8, 0],
@@ -118,7 +118,7 @@ export default function MessageBubble({ role, content, isLoading }: MessageBubbl
           maxWidth: '80%',
           whiteSpace: 'pre-wrap',
           padding: '14px 20px',
-          fontSize: 17,
+          fontSize: 'calc(17px * var(--text-scale, 1))',
           lineHeight: 1.65,
           fontWeight: 400,
           letterSpacing: '-0.1px',

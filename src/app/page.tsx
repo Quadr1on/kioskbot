@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '@/components/ChatInterface';
 import VoiceMode from '@/components/VoiceMode';
-import AccessibilityPanel from '@/components/AccessibilityPanel';
 import { preloadGreetings } from '@/lib/greetingCache';
 
 type Mode = 'select' | 'chat' | 'voice';
@@ -39,12 +38,7 @@ export default function Home() {
   }, [backgroundImages.length]);
 
   if (mode === 'chat') {
-    return (
-      <>
-        <ChatInterface onBackToHome={() => setMode('select')} />
-        <AccessibilityPanel />
-      </>
-    );
+    return <ChatInterface onBackToHome={() => setMode('select')} />;
   }
 
   if (mode === 'voice') {
@@ -453,7 +447,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <AccessibilityPanel />
     </>
   );
 }

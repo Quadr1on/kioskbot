@@ -35,7 +35,7 @@ export default function MicOrb({ onTranscript, disabled = false, language = 'en-
 
         const size = canvas.width;
         const center = size / 2;
-        const baseRadius = size * 0.28;
+        const baseRadius = size * 0.32;
 
         let time = 0;
 
@@ -111,7 +111,7 @@ export default function MicOrb({ onTranscript, disabled = false, language = 'en-
             // Mic icon in center
             ctx.save();
             ctx.translate(center, center);
-            const iconScale = 0.3 + vol * 0.05;
+            const iconScale = 0.55 + vol * 0.05;
             ctx.scale(iconScale, iconScale);
 
             const iconColor = state === 'listening'
@@ -241,25 +241,39 @@ export default function MicOrb({ onTranscript, disabled = false, language = 'en-
                 disabled={disabled || state === 'processing'}
                 className="relative flex items-center justify-center"
                 style={{
-                    width: 56,
-                    height: 56,
+                    width: 72,
+                    height: 72,
                     borderRadius: '50%',
                     background: 'transparent',
-                    border: 'none',
+                    border: state === 'idle'
+                        ? (isDark ? '2.5px solid rgba(0,102,204,0.6)' : '2.5px solid rgba(0,102,204,0.3)')
+                        : '2.5px solid transparent',
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     opacity: disabled ? 0.4 : 1,
+                    boxShadow: state === 'idle' && isDark
+                        ? '0 0 16px rgba(0,102,204,0.3), 0 0 4px rgba(0,102,204,0.2)'
+                        : state === 'listening'
+                            ? '0 0 24px rgba(0,102,204,0.5)'
+                            : 'none',
+                    transition: 'box-shadow 0.3s, border-color 0.3s',
                 }}
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.92 }}
+                animate={state === 'idle' ? {
+                    boxShadow: isDark
+                        ? ['0 0 12px rgba(0,102,204,0.2)', '0 0 20px rgba(0,102,204,0.4)', '0 0 12px rgba(0,102,204,0.2)']
+                        : ['0 0 8px rgba(0,102,204,0.1)', '0 0 16px rgba(0,102,204,0.25)', '0 0 8px rgba(0,102,204,0.1)']
+                } : undefined}
+                transition={state === 'idle' ? { boxShadow: { duration: 2, repeat: Infinity, ease: 'easeInOut' } } : undefined}
                 aria-label={state === 'listening' ? 'Stop recording' : 'Start voice input'}
             >
                 <canvas
                     ref={canvasRef}
-                    width={120}
-                    height={120}
+                    width={160}
+                    height={160}
                     style={{
-                        width: 56,
-                        height: 56,
+                        width: 72,
+                        height: 72,
                     }}
                 />
             </motion.button>

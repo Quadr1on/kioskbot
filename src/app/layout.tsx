@@ -31,7 +31,9 @@ export default function RootLayout({
       <body className={`${inter.variable} antialiased`}>
         <ThemeProvider>
           <KioskProvider>
-            {children}
+            <div id="app-root" style={{ minHeight: '100vh' }}>
+              {children}
+            </div>
           </KioskProvider>
         </ThemeProvider>
       </body>
