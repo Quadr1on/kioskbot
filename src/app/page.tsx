@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '@/components/ChatInterface';
 import VoiceMode from '@/components/VoiceMode';
-import Image from 'next/image';
+import KioskMode from '@/components/KioskMode';
 import { preloadGreetings } from '@/lib/greetingCache';
 
-type Mode = 'select' | 'chat' | 'voice';
+type Mode = 'select' | 'chat' | 'voice' | 'kiosk';
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>('select');
@@ -44,6 +44,10 @@ export default function Home() {
 
   if (mode === 'voice') {
     return <VoiceMode onClose={() => setMode('select')} />;
+  }
+
+  if (mode === 'kiosk') {
+    return <KioskMode onBack={() => setMode('select')} />;
   }
 
   // Inline styles for split-screen layout
@@ -114,7 +118,7 @@ export default function Home() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '48px 40px',
-      background: '#121212',
+      background: '#000000',
       overflowY: 'auto' as const,
     },
     contentWrapper: {
@@ -135,8 +139,8 @@ export default function Home() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px',
-      boxShadow: '0 20px 60px rgba(255, 255, 255, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-      border: '2px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: '0 20px 60px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.1)',
+      border: '2px solid rgba(59, 130, 246, 0.2)',
     },
     logo: {
       width: '100%',
@@ -161,18 +165,18 @@ export default function Home() {
     },
     cardsContainer: {
       display: 'flex',
-      flexDirection: 'row' as const,
-      gap: '20px',
+      flexDirection: 'column' as const,
+      gap: '16px',
       marginBottom: '40px',
       width: '100%',
     },
     card: {
       flex: 1,
       padding: '24px',
-      backgroundColor: '#1a1a1a',
+      backgroundColor: '#111111',
       backdropFilter: 'blur(20px)',
       borderRadius: '24px',
-      border: '1px solid #2a2a2a',
+      border: '1px solid #1a1a1a',
       cursor: 'pointer',
       textAlign: 'center' as const,
       transition: 'all 0.1s ease',
@@ -223,9 +227,9 @@ export default function Home() {
     },
     quickActionButton: {
       padding: '14px 22px',
-      backgroundColor: '#212121',
+      backgroundColor: '#111111',
       backdropFilter: 'blur(20px)',
-      border: '1px solid #2a2a2a',
+      border: '1px solid #1a1a1a',
       borderRadius: '14px',
       color: '#9ca3af',
       fontSize: '14px',
@@ -266,6 +270,9 @@ export default function Home() {
       .mode-card {
         width: 100% !important;
         flex: none !important;
+      }
+      .mode-cards-row {
+        flex-direction: column !important;
       }
     }
   `;
@@ -348,60 +355,110 @@ export default function Home() {
 
           {/* Mode Selection Cards */}
           <div style={styles.cardsContainer} className="cards-container">
-            {/* Chat Mode Card */}
+            {/* Kiosk Mode Card - MAIN/PRIMARY */}
             <motion.button
-              onClick={() => setMode('chat')}
-              style={styles.card}
+              onClick={() => setMode('kiosk')}
+              style={{
+                ...styles.card,
+                flexDirection: 'row' as const,
+                padding: '28px 32px',
+                gap: '20px',
+                textAlign: 'left' as const,
+                backgroundColor: '#0a0a0a',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+              }}
               className="mode-card"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.1 }}
               whileHover={{ 
                 scale: 1.03, 
-                borderColor: 'rgba(59, 130, 246, 0.5)',
+                borderColor: 'rgba(59, 130, 246, 0.6)',
                 boxShadow: '0 20px 60px rgba(59, 130, 246, 0.25)',
                 transition: { duration: 0.1 }
               }}
               whileTap={{ scale: 0.98 }}
             >
-              <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
-                <svg width="28" height="28" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <div style={{
+                ...styles.cardIcon,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                width: '64px',
+                height: '64px',
+                borderRadius: '18px',
+                flexShrink: 0,
+              }}>
+                <svg width="32" height="32" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 15l-2 5m-2-5l2 5m0 0h-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h.01M15 9h.01M9 12h6" />
                 </svg>
               </div>
               <div style={styles.cardContent}>
-                <h2 style={styles.cardTitle}>Chat Mode</h2>
-                <p style={styles.cardDescription}>Type your questions using the on-screen keyboard</p>
+                <h2 style={{ ...styles.cardTitle, fontSize: '22px' }}>Kiosk Mode</h2>
+                <p style={styles.cardDescription}>Touch-friendly interface for booking appointments, checking visiting hours, and more</p>
               </div>
+              <svg width="24" height="24" fill="none" stroke="#555" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </motion.button>
 
-            {/* Voice Mode Card */}
-            <motion.button
-              onClick={() => setMode('voice')}
-              style={styles.card}
-              className="mode-card"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.1 }}
-              whileHover={{ 
-                scale: 1.03, 
-                borderColor: 'rgba(139, 92, 246, 0.5)',
-                boxShadow: '0 20px 60px rgba(139, 92, 246, 0.25)',
-                transition: { duration: 0.1 }
-              }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(139, 92, 246, 0.2)' }}>
-                <svg width="28" height="28" fill="#8B5CF6" viewBox="0 0 24 24">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                </svg>
-              </div>
-              <div style={styles.cardContent}>
-                <h2 style={styles.cardTitle}>Voice Mode</h2>
-                <p style={styles.cardDescription}>Speak naturally in English or Tamil</p>
-              </div>
-            </motion.button>
+            {/* Chat & Voice Mode Row */}
+            <div style={{ display: 'flex', gap: '16px' }} className="mode-cards-row">
+              {/* Chat Mode Card */}
+              <motion.button
+                onClick={() => setMode('chat')}
+                style={styles.card}
+                className="mode-card"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.1 }}
+                whileHover={{ 
+                  scale: 1.03, 
+                  borderColor: 'rgba(59, 130, 246, 0.5)',
+                  boxShadow: '0 20px 60px rgba(59, 130, 246, 0.2)',
+                  transition: { duration: 0.1 }
+                }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(59, 130, 246, 0.15)' }}>
+                  <svg width="28" height="28" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <div style={styles.cardContent}>
+                  <h2 style={styles.cardTitle}>Chat Mode</h2>
+                  <p style={styles.cardDescription}>Type your questions using the on-screen keyboard</p>
+                </div>
+              </motion.button>
+
+              {/* Voice Mode Card */}
+              <motion.button
+                onClick={() => setMode('voice')}
+                style={styles.card}
+                className="mode-card"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.1 }}
+                whileHover={{ 
+                  scale: 1.03, 
+                  borderColor: 'rgba(59, 130, 246, 0.5)',
+                  boxShadow: '0 20px 60px rgba(59, 130, 246, 0.2)',
+                  transition: { duration: 0.1 }
+                }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div style={{ ...styles.cardIcon, backgroundColor: 'rgba(59, 130, 246, 0.15)' }}>
+                  <svg width="28" height="28" fill="#3B82F6" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                  </svg>
+                </div>
+                <div style={styles.cardContent}>
+                  <h2 style={styles.cardTitle}>Voice Mode</h2>
+                  <p style={styles.cardDescription}>Speak naturally in English or Tamil</p>
+                </div>
+              </motion.button>
+            </div>
           </div>
 
           {/* Quick Actions */}
@@ -419,15 +476,15 @@ export default function Home() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
-            {quickActions.map((action, index) => (
+            {quickActions.map((action) => (
               <motion.button
                 key={action}
-                onClick={() => setMode('chat')}
+                onClick={() => setMode('kiosk')}
                 style={styles.quickActionButton}
                 whileHover={{ 
-                  borderColor: 'rgba(99, 102, 241, 0.5)',
+                  borderColor: 'rgba(59, 130, 246, 0.5)',
                   color: 'white',
-                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                  backgroundColor: 'rgba(59, 130, 246, 0.15)',
                 }}
                 whileTap={{ scale: 0.95 }}
               >
